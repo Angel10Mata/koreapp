@@ -177,6 +177,17 @@ export async function updateCliente(
 export async function deleteCliente(id: string) {
   const supabase = await createClient();
 
+  // Verificar explícitamente si tiene proyectos asociados
+  const { data: proyectos } = await supabase
+    .from("proyectos")
+    .select("id")
+    .eq("cliente_id", id)
+    .limit(1);
+
+  if (proyectos && proyectos.length > 0) {
+    return { error: "No se puede eliminar un cliente que tenga proyectos asignados." };
+  }
+
   const { error } = await supabase
     .from("pro_clientes")
     .delete()
@@ -184,6 +195,9 @@ export async function deleteCliente(id: string) {
 
   if (error) {
     console.error("Error deleting cliente:", error);
+    if (error.code === '23503' || error.message?.includes('foreign key constraint')) {
+      return { error: "No se puede eliminar un cliente que tenga proyectos asignados." };
+    }
     return { error: error.message };
   }
 
