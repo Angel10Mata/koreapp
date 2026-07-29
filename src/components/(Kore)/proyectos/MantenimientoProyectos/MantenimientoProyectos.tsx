@@ -388,7 +388,7 @@ export default function MantenimientoProyectos() {
       <AnimatePresence>
         {pagoModalProyecto && (
           <PagoMantenimientoModal
-            proyecto={pagoModalProyecto}
+            proyecto={proyectos.find(p => p.id === pagoModalProyecto.id) || pagoModalProyecto}
             onClose={() => setPagoModalProyecto(null)}
             onSuccess={() => {
               fetchData();

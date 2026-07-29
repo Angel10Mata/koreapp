@@ -22,15 +22,11 @@ import {
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import Swal from "sweetalert2";
 import { useUserContext } from "@/components/(base)/providers/UserProvider";
 import { DEPARTAMENTOS_GUATEMALA } from "@/utils/guatemala";
-import {
-  getClientes,
-  createCliente,
-  updateCliente,
-  deleteCliente,
-} from "@/components/(Kore)/clientes/lib/actions";
+import { useClientes, useDeleteCliente } from "@/components/(Kore)/clientes/lib/hooks";
 
 interface ClienteProyecto {
   id: string;
@@ -103,8 +99,8 @@ export default function ClientesDashboard() {
   const { effectiveRole } = useUserContext();
   const showInvestment = effectiveRole !== "proyectos";
 
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: clientes = [], isLoading: loading } = useClientes();
+  const deleteMutation = useDeleteCliente();
   const [searchTerm, setSearchTerm] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
@@ -115,25 +111,7 @@ export default function ClientesDashboard() {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  useEffect(() => {
-    let active = true;
-    getClientes()
-      .then((data) => {
-        if (active) {
-          setClientes(data || []);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        console.error("Error loading clients:", err);
-        if (active) {
-          setLoading(false);
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  // Eliminated useEffect for data fetching
 
   // Filter clients based on search term
   const filteredClients = useMemo<Cliente[]>(() => {
@@ -212,36 +190,11 @@ export default function ClientesDashboard() {
         clearInterval(timerInterval);
       }
     });
-
     if (result.isConfirmed) {
-      const res = await deleteCliente(client.id);
-      if (res.error) {
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: res.error,
-          background: isDark ? "#09090b" : "#ffffff",
-          color: isDark ? "#ffffff" : "#000000",
-          confirmButtonColor: "#B7494E",
-        });
-      } else {
-        Swal.fire({
-          icon: "success",
-          title: "Eliminado",
-          toast: true,
-          position: "top-end",
-          showConfirmButton: false,
-          timer: 3000,
-          background: isDark ? "#09090b" : "#ffffff",
-          color: isDark ? "#ffffff" : "#000000",
-        });
-        if (expandedClient === client.id) {
-          setExpandedClient(null);
-        }
-        getClientes()
-          .then((data) => setClientes(data || []))
-          .catch((err) => console.error("Error re-fetching clients:", err));
+      if (expandedClient === client.id) {
+        setExpandedClient(null);
       }
+      deleteMutation.mutate(client.id);
     }
   };
 
@@ -307,8 +260,16 @@ export default function ClientesDashboard() {
           {/* Client list */}
           <div className="space-y-3">
             {loading ? (
-              <div className="flex justify-center items-center py-16">
-                <Loader2 className="animate-spin text-celeste-kore size-8" />
+              <div className="space-y-4 pt-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center space-x-4 p-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <div className="space-y-2 flex-1">
+                      <Skeleton className="h-4 w-[250px]" />
+                      <Skeleton className="h-4 w-[200px]" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : filteredClients.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground border border-dashed border-border/50 dark:border-white/10 rounded-2xl bg-white/50 dark:bg-zinc-950/20 backdrop-blur-sm shadow-none">

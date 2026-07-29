@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Swal from "sweetalert2";
+import { toast } from "react-toastify";
 import Link from "next/link";
 import {
   proyectoSchema,
@@ -32,7 +33,7 @@ import {
   TIPOS_DEDUCCION,
   TipoDeduccion,
 } from "@/components/(Kore)/proyectos/lib/zod";
-import { createProyecto, updateProyecto, deleteProyecto, getProyectos } from "@/components/(Kore)/proyectos/lib/actions";
+import { useProyectos, useCreateProyecto, useUpdateProyecto } from "@/components/(Kore)/proyectos/lib/hooks";
 import { useUserContext } from "@/components/(base)/providers/UserProvider";
 import { createClient } from "@/utils/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -40,12 +41,15 @@ import { useRouter, usePathname } from "next/navigation";
 import { KorePhoneInput } from "@/components/ui/KorePhoneInput";
 import { useTheme } from "next-themes";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { deleteProyecto } from "@/components/(Kore)/proyectos/lib/actions";
 import QRProyecto from "../QRProyecto/QRProyecto";
 import { MagicCard } from "@/components/ui/magic-card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CrearClienteModal } from "@/components/(Kore)/clientes/forms/CrearClienteModal";
 
 
 interface ProyectoFormProps {
-  proyecto?: any | null;
+  proyecto?: Record<string, any> | null;
 }
 
 // ── Small shared components ──────────────────────────────────────────────────
@@ -144,10 +148,10 @@ function DeduccionRow({
   onRemove,
   forceOpen,
 }: {
-  field: any;
+  field: Record<string, any>;
   idx: number;
   style: { pill: string; dot: string };
-  users: any[] | undefined;
+  users: Record<string, any>[] | undefined;
   setValue: any;
   register: any;
   onRemove: () => void;
@@ -158,14 +162,14 @@ function DeduccionRow({
   
   // Autocomplete state
   const currentUserId = field.usuario_id || "";
-  const initialUserName = users?.find((u: any) => u.id === currentUserId)?.nombre || "";
+  const initialUserName = users?.find((u: Record<string, any>) => u.id === currentUserId)?.nombre || "";
   const [searchQuery, setSearchQuery] = useState(initialUserName);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Sync searchQuery when users list loads or field initial state changes
   useEffect(() => {
     if (users && field.usuario_id) {
-      const user = users.find((u: any) => u.id === field.usuario_id);
+      const user = users.find((u: Record<string, any>) => u.id === field.usuario_id);
       if (user) {
         setSearchQuery(user.nombre || "");
       }
@@ -186,12 +190,12 @@ function DeduccionRow({
 
   const filteredSuggestions = useMemo(() => {
     if (searchQuery.trim().length < 2) return [];
-    return (users || []).filter((u: any) =>
+    return (users || []).filter((u: Record<string, any>) =>
       u.nombre?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [users, searchQuery]);
 
-  const handleSelectUser = (u: any) => {
+  const handleSelectUser = (u: Record<string, any>) => {
     setValue(`deducciones.${idx}.usuario_id`, u.id);
     setSearchQuery(u.nombre || "");
     setShowSuggestions(false);
@@ -573,7 +577,6 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
 
   // Internal state for fetched proyecto when editing via URL param
   const [proyecto, setProyecto] = useState<any | null>(proyectoProp ?? null);
-  const [loadingProyecto, setLoadingProyecto] = useState(isEditRoute && !proyectoProp);
   const [notFound, setNotFound] = useState(false);
 
   const isEditing = !!(proyecto || paramId || isEditRoute);
@@ -587,32 +590,36 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
     }
   }, [effectiveRole, router]);
 
-  // Fetch project by ID from URL when no prop is passed
+  const { data: proyectos, isLoading: loadingProyectos } = useProyectos();
+  
+  // Update proyecto state when data is loaded
   useEffect(() => {
-    if (!paramId || proyectoProp) return;
-    let active = true;
-    setLoadingProyecto(true);
-    getProyectos()
-      .then((data) => {
-        if (!active) return;
-        const found = data.find((p: any) => p.id === paramId || getCode(p.id) === paramId);
-        if (found) {
-          setProyecto(found);
-        } else {
-          setNotFound(true);
-        }
-      })
-      .catch(() => { if (active) setNotFound(true); })
-      .finally(() => { if (active) setLoadingProyecto(false); });
-    return () => { active = false; };
-  }, [paramId, proyectoProp]);
+    if (proyectoProp) {
+      setProyecto(proyectoProp);
+      return;
+    }
+    if (!paramId || !proyectos) return;
+    
+    const found = proyectos.find((p: any) => p.id === paramId || getCode(p.id) === paramId);
+    if (found) {
+      setProyecto(found);
+    } else {
+      setNotFound(true);
+    }
+  }, [paramId, proyectoProp, proyectos]);
+
+  const loadingProyecto = isEditRoute && !proyectoProp && (loadingProyectos || !proyecto);
+
+  const { mutate: createMutation, isPending: isCreating } = useCreateProyecto();
+  const { mutate: updateMutation, isPending: isUpdating } = useUpdateProyecto();
+  const isMutating = isCreating || isUpdating;
 
   // ── All remaining hooks must be declared before any early return ──
   const supabase = createClient();
   const [qrProyecto, setQrProyecto] = useState<any | null>(null);
   const { theme } = useTheme();
 
-
+  const [isCreatingClient, setIsCreatingClient] = useState(false);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "";
@@ -651,24 +658,9 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
     if (result.isConfirmed) {
       const res = await deleteProyecto(proyecto.id);
       if (res.error) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: res.error,
-          background: isDark ? '#18181b' : '#ffffff',
-          color: isDark ? '#ffffff' : '#000000',
-        });
+        toast.error(res.error);
       } else {
-        Swal.fire({
-          icon: 'success',
-          title: 'Eliminado',
-          toast: true,
-          position: 'top-end',
-          showConfirmButton: false,
-          timer: 3000,
-          background: isDark ? '#18181b' : '#ffffff',
-          color: isDark ? '#ffffff' : '#000000',
-        });
+        toast.success("Eliminado");
         router.push("/kore/proyectos");
       }
     }
@@ -975,10 +967,10 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
     if (proyecto) {
       reset({
         nombre:           proyecto.nombre       || "",
-        cliente_nombre:   proyecto.cliente_nombre  || "",
-        cliente_nit:      proyecto.cliente_nit     || "",
-        cliente_telefono: proyecto.cliente_telefono || "",
-        cliente_correo:   proyecto.cliente_correo   || "",
+        cliente_nombre:   proyecto.pro_clientes?.nombre   || proyecto.cliente_nombre   || "",
+        cliente_nit:      proyecto.pro_clientes?.nit      || proyecto.cliente_nit      || "",
+        cliente_telefono: proyecto.pro_clientes?.telefono || proyecto.cliente_telefono || "",
+        cliente_correo:   proyecto.pro_clientes?.correo   || proyecto.cliente_correo   || "",
         fecha_entrega:    proyecto.fecha_entrega    || "",
         precio:           proyecto.precio           || 0,
         monto_mensual_fijo: proyecto.monto_mensual_fijo || 0,
@@ -1023,48 +1015,30 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
   }
 
   // ── Submit ──
-  const onSubmit = async (data: ProyectoFormValues) => {
+
+  const onSubmit = (data: ProyectoFormValues) => {
     const totalPct = data.deducciones.reduce((acc, curr) => acc + (Number(curr.porcentaje) || 0), 0);
     if (totalPct > 100) {
-      Swal.fire({
-        icon: "error",
-        title: "Suma inválida",
-        text: "Los porcentajes de deducción superan el 100%. Por favor corrige los montos.",
-        background: "#18181b",
-        color: "#fff",
-      });
+      toast.error("Los porcentajes de deducción superan el 100%. Por favor corrige los montos.");
       return;
     }
     
-    // Phone number is already formatted as E164 from KorePhoneInput
-    const res = isEditing
-      ? await updateProyecto(proyecto.id, data)
-      : await createProyecto(data);
-
-    if (res.error) {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: res.error,
-        background: "#18181b",
-        color: "#fff",
+    if (isEditing) {
+      updateMutation({ id: proyecto.id, data }, {
+        onSuccess: (res) => {
+          if (!res.error) {
+            router.push(`/kore/proyectos/ver`);
+          }
+        }
       });
     } else {
-      Swal.fire({
-        icon: "success",
-        title: isEditing ? "Proyecto Actualizado" : "Proyecto Creado",
-        toast: true,
-        position: "top-end",
-        showConfirmButton: false,
-        timer: 3000,
-        background: "#18181b",
-        color: "#fff",
+      createMutation(data, {
+        onSuccess: (res) => {
+          if (!res.error) {
+            router.push("/kore/proyectos");
+          }
+        }
       });
-      if (isEditing) {
-        router.push(`/kore/proyectos/ver`);
-      } else {
-        router.push("/kore/proyectos");
-      }
     }
   };
 
@@ -1130,11 +1104,19 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="estado">Estado</Label>
-                  <SelectWrap id="estado" {...register("estado")}>
-                    <option value="En Progreso">En Progreso</option>
-                    <option value="En pausa">En Pausa</option>
-                    <option value="Finalizados">Finalizado</option>
-                  </SelectWrap>
+                  <Select
+                    value={watch("estado")}
+                    onValueChange={(val) => setValue("estado", val, { shouldValidate: true })}
+                  >
+                    <SelectTrigger className="h-10 w-full rounded-lg border-input bg-background/50 outline-none focus:ring-2 focus:ring-red-600/50">
+                      <SelectValue placeholder="Seleccione el estado" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" sideOffset={4}>
+                      <SelectItem value="En Progreso">En Progreso</SelectItem>
+                      <SelectItem value="En pausa">En Pausa</SelectItem>
+                      <SelectItem value="Finalizados">Finalizado</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
@@ -1148,39 +1130,61 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
                 {/* Search Box */}
                 <div className="grid gap-2 relative" ref={clientAutocompleteRef}>
                   <Label htmlFor="cliente_nombre">Nombre Cliente</Label>
-                  <Input
-                    id="cliente_nombre"
-                    type="text"
-                    placeholder="Escribe el nombre del cliente..."
-                    autoComplete="off"
-                    value={clientSearchQuery}
-                    onFocus={() => {
-                      if (clientSearchQuery.trim().length >= 2 && !justSelectedClient) {
+                  <div className="flex gap-2">
+                    <Input
+                      id="cliente_nombre"
+                      type="text"
+                      placeholder="Escribe el nombre del cliente para buscar..."
+                      autoComplete="off"
+                      value={clientSearchQuery}
+                      onFocus={() => {
+                        if (!justSelectedClient) {
+                          setShowClientSuggestions(true);
+                        }
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => {
+                          const val = clientSearchQuery.trim().toLowerCase();
+                          const matched = (clientes || []).find((c: any) => c.nombre?.toLowerCase() === val);
+                          if (!matched && !justSelectedClient) {
+                            setValue("cliente_nombre", "");
+                            setValue("cliente_nit", "");
+                            setValue("cliente_telefono", "");
+                            setValue("cliente_correo", "");
+                          }
+                        }, 200);
+                      }}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setValue("cliente_nombre", val, { shouldValidate: true });
+                        setJustSelectedClient(false);
                         setShowClientSuggestions(true);
-                      }
-                    }}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setValue("cliente_nombre", val, { shouldValidate: true });
-                      setJustSelectedClient(false);
-                      setShowClientSuggestions(val.trim().length >= 2);
-                      
-                      // Si el nombre no coincide exactamente con un cliente existente, vaciar los campos auto-completados
-                      const matched = (clientes || []).find((c: any) => c.nombre?.toLowerCase() === val.trim().toLowerCase());
-                      if (matched) {
-                        setValue("cliente_nit", matched.nit || "");
-                        setValue("cliente_telefono", matched.telefono || "");
-                        setValue("cliente_correo", matched.correo || "");
-                      } else {
-                        setValue("cliente_nit", "");
-                        setValue("cliente_telefono", "");
-                        setValue("cliente_correo", "");
-                      }
-                    }}
-                    className={errors.cliente_nombre ? "border-destructive ring-1 ring-destructive" : ""}
-                  />
+                        
+                        // Clear standard form values until they strictly select or match one
+                        const matched = (clientes || []).find((c: any) => c.nombre?.toLowerCase() === val.trim().toLowerCase());
+                        if (matched) {
+                          setValue("cliente_nit", matched.nit || "");
+                          setValue("cliente_telefono", matched.telefono || "");
+                          setValue("cliente_correo", matched.correo || "");
+                        } else {
+                          setValue("cliente_nit", "");
+                          setValue("cliente_telefono", "");
+                          setValue("cliente_correo", "");
+                        }
+                      }}
+                      className={errors.cliente_nombre ? "border-destructive ring-1 ring-destructive" : ""}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsCreatingClient(true)}
+                      className="shrink-0 flex items-center justify-center bg-muted/20 hover:bg-muted/50 border border-border/50 text-foreground px-4 rounded-lg transition-colors"
+                      title="Crear nuevo cliente"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
                   <AnimatePresence>
-                    {showClientSuggestions && filteredClientes.length > 0 && (
+                    {showClientSuggestions && (
                       <motion.ul
                         initial={{ opacity: 0, y: -6 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -1188,25 +1192,42 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
                         transition={{ duration: 0.15 }}
                         className="absolute top-full left-0 right-0 z-50 mt-1 rounded-xl border border-border/60 bg-popover text-popover-foreground shadow-2xl shadow-black/40 overflow-hidden max-h-48 overflow-y-auto"
                       >
-                        {filteredClientes.map((c: any) => (
-                          <li
-                            key={c.id}
-                            onMouseDown={() => {
-                              setJustSelectedClient(true);
-                              setValue("cliente_nombre", c.nombre, { shouldValidate: true });
-                              setValue("cliente_nit", c.nit || "");
-                              setValue("cliente_telefono", c.telefono || "");
-                              setValue("cliente_correo", c.correo || "");
-                              setShowClientSuggestions(false);
-                            }}
-                            className="px-4 py-2 text-sm hover:bg-muted cursor-pointer transition-colors text-left"
-                          >
-                            <p className="font-bold text-foreground">{c.nombre}</p>
-                            {c.nit && (
-                              <p className="text-[10px] text-muted-foreground">NIT: {c.nit}</p>
-                            )}
+                        {filteredClientes.length > 0 ? (
+                          filteredClientes.map((c: any) => (
+                            <li
+                              key={c.id}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setJustSelectedClient(true);
+                                setValue("cliente_nombre", c.nombre, { shouldValidate: true });
+                                setValue("cliente_nit", c.nit || "");
+                                setValue("cliente_telefono", c.telefono || "");
+                                setValue("cliente_correo", c.correo || "");
+                                setShowClientSuggestions(false);
+                              }}
+                              className="px-4 py-2 text-sm hover:bg-muted cursor-pointer transition-colors text-left border-b border-border/30 last:border-0"
+                            >
+                              <p className="font-bold text-foreground">{c.nombre}</p>
+                              {c.nit && (
+                                <p className="text-[10px] text-muted-foreground">NIT: {c.nit}</p>
+                              )}
+                            </li>
+                          ))
+                        ) : (
+                          <li className="px-4 py-4 text-sm text-center text-muted-foreground">
+                            <p>No se encontraron clientes.</p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowClientSuggestions(false);
+                                setIsCreatingClient(true);
+                              }}
+                              className="mt-2 text-celeste-kore font-bold flex items-center justify-center gap-1 w-full p-2 rounded-lg hover:bg-celeste-kore/10"
+                            >
+                              <Plus className="h-4 w-4" /> Crear Cliente
+                            </button>
                           </li>
-                        ))}
+                        )}
                       </motion.ul>
                     )}
                   </AnimatePresence>
@@ -1633,16 +1654,21 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
                             <div className="col-span-1 md:col-span-5 grid grid-cols-[1fr_100px] gap-3">
                               <div className="grid gap-1.5">
                                 <Label>Tipo</Label>
-                                <SelectWrap
+                                <Select
                                   value={newDed.tipo}
-                                  onChange={(e) => handleTipoChange(e.target.value)}
+                                  onValueChange={(val) => handleTipoChange(val)}
                                 >
-                                  {TIPOS_DEDUCCION.map((t) => (
-                                    <option key={t} value={t}>
-                                      {t}
-                                    </option>
-                                  ))}
-                                </SelectWrap>
+                                  <SelectTrigger className="h-10 w-full rounded-lg border-input bg-background/50 outline-none focus:ring-2 focus:ring-red-600/50">
+                                    <SelectValue placeholder="Seleccione un tipo" />
+                                  </SelectTrigger>
+                                  <SelectContent position="popper" sideOffset={4}>
+                                    {TIPOS_DEDUCCION.map((t) => (
+                                      <SelectItem key={t} value={t}>
+                                        {t}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </div>
                               <div className="grid gap-1.5">
                                 <Label>% / Monto</Label>
@@ -1797,6 +1823,21 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
         </div>
 
 
+
+      {isCreatingClient && (
+        <CrearClienteModal
+          isOpen={isCreatingClient}
+          onClose={() => setIsCreatingClient(false)}
+          initialName={watch("cliente_nombre") || ""}
+          onSuccess={(newCliente) => {
+            setJustSelectedClient(true);
+            setValue("cliente_nombre", newCliente.nombre, { shouldValidate: true });
+            setValue("cliente_nit", newCliente.nit || "");
+            setValue("cliente_telefono", newCliente.telefono || "");
+            setValue("cliente_correo", newCliente.correo || "");
+          }}
+        />
+      )}
 
       {/* MODAL QR */}
       <QRProyecto

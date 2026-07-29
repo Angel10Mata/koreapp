@@ -8,14 +8,14 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useUserContext } from "@/components/(base)/providers/UserProvider";
-import { deleteProyecto, getProyectos } from "@/components/(Kore)/proyectos/lib/actions";
+import { useProyectos, useDeleteProyecto } from "@/components/(Kore)/proyectos/lib/hooks";
 import Swal from "sweetalert2";
 import { useTheme } from "next-themes";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
 
 interface ProyectoDetalleProps {
-  proyecto?: any;
+  proyecto?: Record<string, any>;
 }
 
 const DASH_TIPO_STYLE: Record<string, string> = {
@@ -27,7 +27,15 @@ const DASH_TIPO_STYLE: Record<string, string> = {
   "Desarrollador": "bg-sky-500/10 text-sky-400 border-sky-500/25",
 };
 
-function DetailDeduccionItem({ d, forceOpen, precio }: { d: any; forceOpen: boolean; precio: number }) {
+interface DetalleDed {
+  tipo: string;
+  porcentaje: number | string;
+  descripcion?: string;
+  usuario_nombre?: string;
+  usuario_id?: string;
+}
+
+function DetailDeduccionItem({ d, forceOpen, precio }: { d: DetalleDed; forceOpen: boolean; precio: number }) {
   const [open, setOpen] = useState(false);
   const userName = d.usuario_nombre || "";
   const hasDetails = !!(userName || d.descripcion);
@@ -106,7 +114,7 @@ function DetailDedListWithToggle({
   mant,
   restante,
 }: {
-  deds: any[];
+  deds: DetalleDed[];
   totalPct: number;
   precio: number;
   mant: number;
@@ -233,8 +241,7 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
     }
   }, [router, proyectoProp]);
 
-  const [proyecto, setProyecto] = useState<any | null>(proyectoProp ?? null);
-  const [loadingProyecto, setLoadingProyecto] = useState(!!paramId && !proyectoProp);
+  const [proyecto, setProyecto] = useState<Record<string, any> | null>(proyectoProp ?? null);
   const [notFound, setNotFound] = useState(false);
 
   const { effectiveRole } = useUserContext();
@@ -243,6 +250,27 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
   const [showRiskZone, setShowRiskZone] = useState(false);
   const [hoveredSegment, setHoveredSegment] = useState<{name: string, value: number, color: string} | null>(null);
 
+  const { data: proyectos, isLoading: loadingProyectos } = useProyectos();
+  const deleteMutation = useDeleteProyecto();
+  
+  // Update proyecto state when data is loaded
+  useEffect(() => {
+    if (proyectoProp) {
+      setProyecto(proyectoProp);
+      return;
+    }
+    if (!paramId || !proyectos) return;
+    
+    const found = proyectos.find((p: any) => p.id === paramId || getCode(p.id) === paramId);
+    if (found) {
+      setProyecto(found);
+    } else {
+      setNotFound(true);
+    }
+  }, [paramId, proyectoProp, proyectos]);
+
+  const loadingProyecto = (!proyectoProp && !!paramId) && (loadingProyectos || !proyecto);
+
   // Role guard
   useEffect(() => {
     if (!["super", "admin", "proyectos"].includes(effectiveRole)) {
@@ -250,28 +278,8 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
     }
   }, [effectiveRole, router]);
 
-  // Fetch project by ID from URL when no prop is passed
-  useEffect(() => {
-    if (!paramId || proyectoProp) return;
-    let active = true;
-    setLoadingProyecto(true);
-    getProyectos()
-      .then((data) => {
-        if (!active) return;
-        const found = data.find((p: any) => p.id === paramId || getCode(p.id) === paramId);
-        if (found) {
-          setProyecto(found);
-        } else {
-          setNotFound(true);
-        }
-      })
-      .catch(() => { if (active) setNotFound(true); })
-      .finally(() => { if (active) setLoadingProyecto(false); });
-    return () => { active = false; };
-  }, [paramId, proyectoProp]);
-
   // Loading state
-  if (loadingProyecto) {
+  if (loadingProyecto && !notFound) {
     return (
       <div className="flex-1 flex items-center justify-center p-4 pt-32 md:p-8 md:pt-24">
         <div className="flex flex-col items-center gap-4 text-muted-foreground">
@@ -362,28 +370,13 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
     });
 
     if (result.isConfirmed) {
-      const res = await deleteProyecto(proyecto.id);
-      if (res.error) {
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: res.error,
-          background: isDark ? "#09090b" : "#ffffff",
-          color: isDark ? "#ffffff" : "#000000",
-        });
-      } else {
-        Swal.fire({
-          icon: "success",
-          title: "Eliminado",
-          toast: true,
-          position: "top-end",
-          showConfirmButton: false,
-          timer: 3000,
-          background: isDark ? "#09090b" : "#ffffff",
-          color: isDark ? "#ffffff" : "#000000",
-        });
-        router.push("/kore/proyectos");
-      }
+      deleteMutation.mutate(proyecto.id, {
+        onSuccess: (res) => {
+          if (!res.error) {
+            router.push("/kore/proyectos");
+          }
+        }
+      });
     }
   };
 

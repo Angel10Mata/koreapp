@@ -24,6 +24,7 @@ import {
   Home,
   Wrench,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import {
   BarChart,
@@ -36,7 +37,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { getProyectos, deleteProyecto } from "@/components/(Kore)/proyectos/lib/actions";
+import { useProyectos, useDeleteProyecto } from "@/components/(Kore)/proyectos/lib/hooks";
 import Swal from "sweetalert2";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -72,7 +73,15 @@ const DASH_TIPO_STYLE: Record<string, string> = {
   "Desarrollador": "bg-sky-500/10 text-sky-400 border-sky-500/25",
 };
 
-function DashboardDeduccionItem({ d, forceOpen, precio }: { d: any; forceOpen: boolean; precio: number }) {
+interface DashboardDed {
+  tipo: string;
+  porcentaje: number | string;
+  descripcion?: string;
+  usuario_nombre?: string;
+  usuario_id?: string;
+}
+
+function DashboardDeduccionItem({ d, forceOpen, precio }: { d: DashboardDed; forceOpen: boolean; precio: number }) {
   const [open, setOpen] = useState(false);
   const userName = d.usuario_nombre || "";
   const hasDetails = !!(userName || d.descripcion);
@@ -148,7 +157,7 @@ function DedListWithToggle({
   mant,
   restante,
 }: {
-  deds: any[];
+  deds: DashboardDed[];
   totalPct: number;
   precio: number;
   mant: number;
@@ -383,8 +392,8 @@ export default function DashboardProyectos() {
     });
   };
 
-  const [proyectos, setProyectos] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: proyectos = [], isLoading: loading, refetch } = useProyectos();
+  const deleteMutation = useDeleteProyecto();
   const [searchTerm, setSearchTerm] = useState("");
   const [showList, setShowList] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -396,29 +405,14 @@ export default function DashboardProyectos() {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const data = await getProyectos();
-      setProyectos(data || []);
-      
-      // Si el modal de QR está abierto, actualizar sus datos con la información más reciente de la DB
-      if (qrProyecto) {
-        const updated = data?.find((p: any) => p.id === qrProyecto.id);
-        if (updated) {
-          setQrProyecto(updated);
-        }
-      }
-    } catch (err) {
-      console.error("Error fetching projects:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (qrProyecto && proyectos.length > 0) {
+      const updated = proyectos.find((p: Record<string, any>) => p.id === qrProyecto.id);
+      if (updated) {
+        setQrProyecto(updated);
+      }
+    }
+  }, [proyectos, qrProyecto?.id]);
 
   // Load Lordicon script
   useEffect(() => {
@@ -590,30 +584,8 @@ export default function DashboardProyectos() {
     });
 
     if (result.isConfirmed) {
-      const res = await deleteProyecto(id);
-      if (res.error) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: res.error,
-          background: isDark ? '#18181b' : '#ffffff',
-          color: isDark ? '#ffffff' : '#000000',
-        });
-        return false;
-      } else {
-        Swal.fire({
-          icon: 'success',
-          title: 'Eliminado',
-          toast: true,
-          position: 'top-end',
-          showConfirmButton: false,
-          timer: 3000,
-          background: isDark ? '#18181b' : '#ffffff',
-          color: isDark ? '#ffffff' : '#000000',
-        });
-        fetchData();
-        return true;
-      }
+      deleteMutation.mutate(id);
+      return true;
     }
     return false;
   };
@@ -948,8 +920,16 @@ export default function DashboardProyectos() {
               className="w-full overflow-hidden"
             >
               {loading ? (
-                <div className="flex justify-center items-center py-10">
-                  <RefreshCw className="animate-spin text-celeste-kore" />
+                <div className="space-y-4 py-8">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4 p-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
+                      <Skeleton className="h-12 w-12 rounded-full" />
+                      <div className="space-y-2 flex-1">
+                        <Skeleton className="h-4 w-[250px]" />
+                        <Skeleton className="h-4 w-[200px]" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : filteredProyectos.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground border-t border-border/30">
@@ -1790,8 +1770,16 @@ export default function DashboardProyectos() {
           </div>
 
           {loading ? (
-            <div className="flex justify-center items-center py-10">
-              <RefreshCw className="animate-spin text-celeste-kore" />
+            <div className="space-y-3 pt-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center space-x-4 p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+                  <Skeleton className="h-10 w-10 rounded-md" />
+                  <div className="space-y-2 flex-1">
+                    <Skeleton className="h-4 w-[200px]" />
+                    <Skeleton className="h-3 w-[150px]" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : proyectosConFecha.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground border-t border-border/30">
@@ -1849,7 +1837,7 @@ export default function DashboardProyectos() {
         isOpen={!!qrProyecto}
         proyecto={qrProyecto}
         onClose={() => setQrProyecto(null)}
-        onSuccess={fetchData}
+        onSuccess={refetch}
       />
     </div>
   );

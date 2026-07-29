@@ -2,10 +2,10 @@
 
 import { useRef, useState, useEffect } from "react";
 import { QRCode } from "react-qrcode-logo";
-import { X, Download } from "lucide-react";
+import { X, Download, QrCode } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Swal from "sweetalert2";
-import { updateProyectoOtrosCampos } from "@/components/(Kore)/proyectos/lib/actions";
+import { useUpdateProyectoOtrosCampos } from "@/components/(Kore)/proyectos/lib/hooks";
 import { useTheme } from "next-themes";
 
 interface QRProyectoProps {
@@ -40,58 +40,36 @@ export default function QRProyecto({ proyecto, isOpen, onClose, onSuccess }: QRP
       setUsuarioAcceso(otros.usuario_acceso || "");
       setPassAcceso(otros.pass_acceso || "");
       
-      const isLocalhost = typeof window !== "undefined" && (window.location.hostname.includes("localhost") || window.location.hostname.includes("127.0.0.1"));
-      const origin = typeof window !== "undefined" && !isLocalhost ? window.location.origin : "https://koreapp.vercel.app";
-      setUrlAcceso(otros.url_acceso || `${origin}/login`);
+      setUrlAcceso(otros.url_acceso || "");
     }
   }, [isOpen, proyecto]);
 
-  const handleSave = async () => {
+  const updateOtrosCamposMutation = useUpdateProyectoOtrosCampos();
+
+  const handleSave = () => {
     if (!proyecto) return;
     setSaving(true);
-    try {
-      const res = await updateProyectoOtrosCampos(proyecto.id, {
-        usuario_acceso: usuarioAcceso.trim(),
-        pass_acceso: passAcceso.trim(),
-        url_acceso: urlAcceso.trim(),
-      });
-
-      const isDark = theme === "dark";
-      if (res.error) {
-        Swal.fire({
-          icon: "error",
-          title: "Error al guardar",
-          text: res.error,
-          background: isDark ? "#18181b" : "#ffffff",
-          color: isDark ? "#ffffff" : "#000000",
-        });
-      } else {
-        Swal.fire({
-          icon: "success",
-          title: "Credenciales guardadas",
-          toast: true,
-          position: "top-end",
-          showConfirmButton: false,
-          timer: 3000,
-          background: isDark ? "#18181b" : "#ffffff",
-          color: isDark ? "#ffffff" : "#000000",
-        });
-        if (onSuccess) {
-          onSuccess();
-        }
+    updateOtrosCamposMutation.mutate(
+      {
+        id: proyecto.id,
+        otrosCampos: {
+          usuario_acceso: usuarioAcceso.trim(),
+          pass_acceso: passAcceso.trim(),
+          url_acceso: urlAcceso.trim(),
+        },
+      },
+      {
+        onSuccess: (res) => {
+          setSaving(false);
+          if (!res.error && onSuccess) {
+            onSuccess();
+          }
+        },
+        onError: () => {
+          setSaving(false);
+        },
       }
-    } catch (err: any) {
-      const isDark = theme === "dark";
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: err.message || "Error al intentar guardar",
-        background: isDark ? "#18181b" : "#ffffff",
-        color: isDark ? "#ffffff" : "#000000",
-      });
-    } finally {
-      setSaving(false);
-    }
+    );
   };
 
   if (!proyecto) return null;
@@ -100,15 +78,8 @@ export default function QRProyecto({ proyecto, isOpen, onClose, onSuccess }: QRP
   const code = proyecto.id.replace(/-/g, "").slice(0, 6).toUpperCase();
   const shortCode = code.slice(0, 3) + "-" + code.slice(3, 6);
 
-  // URL del proyecto (enlace de compartición pública con parámetros manuales opcionales)
-  const isLocal = typeof window !== "undefined" && (window.location.hostname.includes("localhost") || window.location.hostname.includes("127.0.0.1"));
-  const baseUrl = typeof window !== "undefined" && !isLocal ? window.location.origin : "https://koreapp.vercel.app";
-  
-  // Construir la URL simplificada usando solo el ID para que los cuadros del QR sean más grandes
-  const shareUrl = `${baseUrl}/proyecto?id=${proyecto.id}`;
-
-  // El QR debe contener la URL directa para que el celular la abra al escanear
-  const qrValue = shareUrl;
+  // El QR se generará basado en la URL de acceso configurada para el cliente
+  const qrValue = urlAcceso;
 
   const handleDownload = () => {
     const canvas = canvasRef.current?.querySelector("canvas");
@@ -208,21 +179,30 @@ export default function QRProyecto({ proyecto, isOpen, onClose, onSuccess }: QRP
                 ref={canvasRef}
                 className="p-6 bg-white rounded-2xl shrink-0 border border-zinc-200/80 shadow-md"
               >
-                <QRCode
-                  value={qrValue}
-                  size={280}
-                  bgColor="#ffffff"
-                  fgColor="#09090b"
-                  ecLevel="H"
-                  qrStyle="dots"
-                  logoImage="/kore/kore.png"
-                  logoWidth={96}
-                  logoHeight={54}
-                  logoPadding={5}
-                  logoPaddingStyle="square"
-                  removeQrCodeBehindLogo={true}
-                  eyeRadius={10}
-                />
+                {qrValue ? (
+                  <QRCode
+                    value={qrValue}
+                    size={280}
+                    bgColor="#ffffff"
+                    fgColor="#09090b"
+                    ecLevel="H"
+                    qrStyle="dots"
+                    logoImage="/kore/kore.png"
+                    logoWidth={96}
+                    logoHeight={54}
+                    logoPadding={5}
+                    logoPaddingStyle="square"
+                    removeQrCodeBehindLogo={true}
+                    eyeRadius={10}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center gap-4 w-[280px] h-[280px]">
+                    <QrCode className="w-16 h-16 text-slate-200" />
+                    <p className="text-sm font-bold text-slate-400 max-w-[200px]">
+                      Coloca una URL de acceso para generar el código QR
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Formulario de Configuración de Acceso manual */}
@@ -282,7 +262,8 @@ export default function QRProyecto({ proyecto, isOpen, onClose, onSuccess }: QRP
               {/* Download Button */}
               <button
                 onClick={handleDownload}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#B7494E] hover:bg-[#B7494E]/90 text-white font-black text-sm tracking-wider transition-all active:scale-[0.98] shadow-lg shadow-[#B7494E]/20 cursor-pointer shrink-0"
+                disabled={!qrValue}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#B7494E] hover:bg-[#B7494E]/90 text-white font-black text-sm tracking-wider transition-all active:scale-[0.98] shadow-lg shadow-[#B7494E]/20 cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Download size={16} />
                 DESCARGAR QR

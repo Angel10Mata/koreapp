@@ -6,7 +6,8 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, X, Briefcase, Save, Plus, Trash2, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
-import Swal from "sweetalert2";
+import { toast } from "react-toastify";
+import { ModalShell, ModalLabel, ModalInput, ModalSelect, ModalFooter, ModalSubmit } from "@/components/ui/general-modal";
 import {
   proyectoSchema,
   ProyectoFormValues,
@@ -31,47 +32,20 @@ interface ProyectoModalProps {
 // ── Shared micro-components ──────────────────────────────────────────────────
 
 const Label = ({ className, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) => (
-  <label
-    {...props}
-    className={cn(
-      "text-xs font-semibold leading-none text-foreground/70 uppercase tracking-wider",
-      className
-    )}
-  />
+  <ModalLabel className={className} {...props} />
 );
 
-const Input = ({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) => (
-  <input
-    {...props}
-    className={cn(
-      "flex h-10 w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600/50 transition-all outline-none disabled:opacity-50 disabled:bg-muted/30 disabled:cursor-not-allowed",
-      className
-    )}
-  />
-);
+const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(({ className, ...props }, ref) => (
+  <ModalInput ref={ref} className={className} {...props} />
+));
+Input.displayName = "Input";
 
-const SelectWrap = ({
-  className,
-  children,
-  ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement>) => (
-  <div className="relative">
-    <select
-      {...props}
-      className={cn(
-        "flex h-10 w-full appearance-none rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-red-600/50 transition-all disabled:opacity-50 disabled:bg-muted/30 disabled:cursor-not-allowed",
-        className
-      )}
-    >
-      {children}
-    </select>
-    <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-      <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </div>
-  </div>
-);
+const SelectWrap = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(({ className, children, ...props }, ref) => (
+  <ModalSelect ref={ref} className={className} {...props}>
+    {children}
+  </ModalSelect>
+));
+SelectWrap.displayName = "SelectWrap";
 
 const formatPhoneDisplay = (phone: string | null | undefined): string => {
   if (!phone) return "";
@@ -333,14 +307,9 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
       : await createProyecto(data);
 
     if (res.error) {
-      Swal.fire({ icon: "error", title: "Error", text: res.error, background: "#18181b", color: "#fff" });
+      toast.error(res.error);
     } else {
-      Swal.fire({
-        icon: "success",
-        title: isEditing ? "Proyecto Actualizado" : "Proyecto Creado",
-        toast: true, position: "top-end", showConfirmButton: false,
-        timer: 3000, background: "#18181b", color: "#fff",
-      });
+      toast.success(isEditing ? "Proyecto Actualizado" : "Proyecto Creado");
       onClose();
     }
   };
@@ -350,48 +319,19 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
   if (!isOpen) return null;
 
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-[110] bg-background md:bg-background/60 md:backdrop-blur-sm md:flex md:items-center md:justify-center md:p-4 md:overflow-y-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 40 }}
-          transition={{ duration: 0.25, ease: "easeOut" }}
-          className="w-full h-full flex flex-col bg-card overflow-hidden
-            md:h-auto md:max-w-2xl md:rounded-3xl md:shadow-none dark:md:shadow-2xl md:border md:border-celeste-kore/55 dark:md:border-border/50 md:my-auto"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-border/50 bg-muted/5 sticky top-0 z-10 backdrop-blur-md">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/40 flex items-center justify-center border border-red-200 dark:border-red-900/30">
-                <Briefcase size={20} className="text-celeste-kore" />
-              </div>
-              <div>
-                <h3 className="text-xl font-black tracking-tight text-foreground uppercase">
-                  {isEditing ? "Editar Proyecto" : "Nuevo Proyecto"}
-                </h3>
-                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
-                  {isEditing ? "Modificando información" : "Registro de datos"}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 rounded-full hover:bg-muted/50 transition-colors cursor-pointer"
-            >
-              <X size={20} className="text-muted-foreground" />
-            </button>
-          </div>
-
-          {/* Scrollable body */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 custom-scrollbar md:max-h-[70vh]">
-            <form
-              id="proyecto-form"
-              onSubmit={handleSubmit(onSubmit as any, onInvalid)}
-              className="space-y-6"
-            >
-              {/* ── Información General ── */}
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEditing ? "Editar Proyecto" : "Nuevo Proyecto"}
+      subtitle={isEditing ? "Modificando información" : "Registro de datos"}
+      maxWidth="2xl"
+    >
+      <form
+        id="proyecto-form"
+        onSubmit={handleSubmit(onSubmit as any, onInvalid)}
+        className="space-y-6"
+      >
+        {/* ── Información General ── */}
               <div className="space-y-4">
                 <h4 className="text-xs font-black text-celeste-kore uppercase tracking-widest border-b border-border/50 pb-2">
                   Información General
@@ -826,26 +766,13 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
           </div>
 
           {/* Footer */}
-          <div className="p-4 md:p-6 border-t border-border/50 bg-card md:bg-muted/5 flex justify-end gap-3 shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2.5 rounded-xl border border-border/50 bg-background hover:bg-muted/50 transition-colors text-xs font-bold uppercase tracking-widest cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button
+          <ModalFooter>
+            <ModalSubmit
               form="proyecto-form"
-              type="submit"
-              disabled={isSubmitting}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl border border-celeste-kore bg-transparent text-celeste-kore hover:bg-celeste-kore/10 transition-all text-xs font-black uppercase tracking-widest cursor-pointer disabled:opacity-50"
-            >
-              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              {isEditing ? "Guardar" : "Crear"}
-            </button>
-          </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>
+              isLoading={isSubmitting}
+              text={isEditing ? "Guardar" : "Crear"}
+            />
+          </ModalFooter>
+    </ModalShell>
   );
 }

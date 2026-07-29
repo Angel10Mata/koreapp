@@ -20,6 +20,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   configuraciones: "Configuraciones",
   dispositivos: "Dispositivos de Acceso",
   usuarios: "Gestión de Usuarios",
+  finanzas: "Finanzas",
 };
 
 export function BreadcrumbNav() {

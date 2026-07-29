@@ -12,13 +12,12 @@ import {
   MapPin,
   Loader2
 } from "lucide-react";
-import Swal from "sweetalert2";
-import { DEPARTAMENTOS_GUATEMALA } from "@/utils/guatemala";
 import {
-  getClientes,
-  createCliente,
-  updateCliente
-} from "@/components/(Kore)/clientes/lib/actions";
+  useClientes,
+  useCreateCliente,
+  useUpdateCliente
+} from "@/components/(Kore)/clientes/lib/hooks";
+import { DEPARTAMENTOS_GUATEMALA } from "@/utils/guatemala";
 
 const COUNTRIES = [
   { code: "+502", flag: "🇬🇹", name: "Guatemala" },
@@ -57,8 +56,10 @@ function ClienteFormContent() {
   const isEditRoute = pathname?.includes("/editar");
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  
+  const { data: allClientes, isLoading: loadingClientes } = useClientes();
+  const createMutation = useCreateCliente();
+  const updateMutation = useUpdateCliente();
 
   // Form State
   const [formData, setFormData] = useState({
@@ -99,41 +100,23 @@ function ClienteFormContent() {
 
   // Load client details if editing
   useEffect(() => {
-    if (!editingId) return;
-    setLoading(true);
-    getClientes()
-      .then((data) => {
-        const found = data.find((c) => c.id === editingId);
-        if (found) {
-          const { countryCode, localNumber } = parsePhoneNumber(found.telefono || "");
-          setSelectedCountry(countryCode);
-          setFormData({
-            nombre: found.nombre,
-            nit: found.nit || "",
-            telefono: localNumber,
-            correo: found.correo || "",
-            departamento: found.departamento || "",
-            municipio: found.municipio || "",
-          });
-        } else {
-          Swal.fire({
-            icon: "error",
-            title: "Error",
-            text: "Cliente no encontrado.",
-            background: "#18181b",
-            color: "#fff",
-            confirmButtonColor: "#B7494E",
-          });
-          router.replace("/kore/clientes");
-        }
-      })
-      .catch((err) => {
-        console.error("Error loading client:", err);
-      })
-      .finally(() => {
-        setLoading(false);
+    if (!editingId || !allClientes) return;
+    const found = allClientes.find((c) => c.id === editingId);
+    if (found) {
+      const { countryCode, localNumber } = parsePhoneNumber(found.telefono || "");
+      setSelectedCountry(countryCode);
+      setFormData({
+        nombre: found.nombre,
+        nit: found.nit || "",
+        telefono: localNumber,
+        correo: found.correo || "",
+        departamento: found.departamento || "",
+        municipio: found.municipio || "",
       });
-  }, [editingId, router]);
+    } else {
+      router.replace("/kore/clientes");
+    }
+  }, [editingId, allClientes, router]);
 
   const municipiosDisponibles = useMemo(() => {
     if (!formData.departamento) return [];
@@ -207,42 +190,28 @@ function ClienteFormContent() {
     e.preventDefault();
     if (!validateForm()) return;
 
-    setSubmitting(true);
     const payload = {
       ...formData,
       telefono: selectedCountry + formData.telefono.trim(),
     };
 
-    let res: { success?: boolean; error?: string; cliente?: unknown };
     if (editingId) {
-      res = await updateCliente(editingId, payload);
-    } else {
-      res = await createCliente(payload);
-    }
-    setSubmitting(false);
-
-    if (res.error) {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: res.error,
-        background: "#18181b",
-        color: "#fff",
-        confirmButtonColor: "#B7494E",
+      updateMutation.mutate({ id: editingId, data: payload }, {
+        onSuccess: (res) => {
+          if (!res.error) {
+            sessionStorage.removeItem("selectedClienteId");
+            router.push("/kore/clientes");
+          }
+        }
       });
     } else {
-      Swal.fire({
-        icon: "success",
-        title: editingId ? "Cliente Actualizado" : "Cliente Registrado",
-        toast: true,
-        position: "top-end",
-        showConfirmButton: false,
-        timer: 3000,
-        background: "#18181b",
-        color: "#fff",
+      createMutation.mutate(payload, {
+        onSuccess: (res) => {
+          if (!res.error) {
+            router.push("/kore/clientes");
+          }
+        }
       });
-      sessionStorage.removeItem("selectedClienteId");
-      router.push("/kore/clientes");
     }
   };
 
@@ -251,7 +220,9 @@ function ClienteFormContent() {
     router.push("/kore/clientes");
   };
 
-  if (loading) {
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
+  if (editingId && loadingClientes) {
     return (
       <div className="w-full min-h-screen flex justify-center items-center bg-background text-foreground">
         <Loader2 className="animate-spin text-celeste-kore size-10" />
@@ -549,14 +520,10 @@ function ClienteFormContent() {
             </button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={isSubmitting}
               className="px-8 py-3 rounded-xl bg-celeste-kore text-black hover:bg-celeste-kore/90 font-black text-xs uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
             >
-              {submitting ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Save size={14} />
-              )}
+              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               {editingId ? "Actualizar" : "Registrar"}
             </button>
           </div>
