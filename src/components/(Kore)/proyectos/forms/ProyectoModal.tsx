@@ -1,4 +1,5 @@
 "use client";
+import React from 'react';
 
 import { useEffect, useState, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -763,7 +764,6 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
                 </div>
               )}
             </form>
-          </div>
 
           {/* Footer */}
           <ModalFooter>
