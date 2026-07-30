@@ -11,13 +11,13 @@ import {
   Activity,
   TrendingUp,
   TrendingDown,
-  Trash2,
   Loader2,
   Plus,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Ban
 } from "lucide-react";
-import { useFlujoCaja, useEliminarGasto } from "./lib/hooks";
+import { useFlujoCaja, useAnularGasto, useAnularIngreso } from "@/components/(Kore)/finanzas/lib/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
@@ -27,7 +27,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { CrearGastoModal } from "./forms/CrearGastoModal";
+import { CrearGastoModal } from "@/components/(Kore)/finanzas/forms/CrearGastoModal";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
 
@@ -143,7 +143,8 @@ function CustomMonthPicker({ value, onChange }: { value: string, onChange: (v: s
 
 export function FinanzasDashboard() {
   const { data: flujoCaja, isLoading, isError, error } = useFlujoCaja();
-  const eliminarGastoMutation = useEliminarGasto();
+  const anularGastoMutation = useAnularGasto();
+  const anularIngresoMutation = useAnularIngreso();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMovimiento, setFilterMovimiento] = useState<"todos" | "ingreso" | "egreso">("todos");
@@ -186,12 +187,15 @@ export function FinanzasDashboard() {
     });
   }, [flujoCaja, filterPeriod, dateDia, dateMes, dateRango]);
 
-  // 2. Métricas basadas en la fecha seleccionada
+  // 2. Métricas basadas en la fecha seleccionada (excluye registros anulados)
   const metricas = useMemo(() => {
     let ingresos = 0;
     let egresos = 0;
 
     dateFilteredData.forEach(item => {
+      // Excluir registros anulados del cálculo de métricas
+      if (item.estado === "anulado") return;
+
       const amt = Number(item.monto) || 0;
       if (item.tipo_movimiento === "ingreso") {
         ingresos += amt;
@@ -203,13 +207,17 @@ export function FinanzasDashboard() {
     return { ingresos, egresos, balance: ingresos - egresos };
   }, [dateFilteredData]);
 
-  // 3. Calcular saldos progresivos
+  // 3. Calcular saldos progresivos (excluye anulados del cálculo de saldo)
   const flujoConSaldo = useMemo(() => {
     // Clonar e invertir (viene descendente, lo pasamos a ascendente)
     const asc = [...dateFilteredData].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
     
     let current = 0;
     const withSaldo = asc.map(item => {
+      // Los registros anulados no afectan el saldo progresivo
+      if (item.estado === "anulado") {
+        return { ...item, saldo: current };
+      }
       const amt = Number(item.monto) || 0;
       if (item.tipo_movimiento === "ingreso") current += amt;
       else current -= amt;
@@ -248,26 +256,30 @@ export function FinanzasDashboard() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
-  const handleEliminar = async (id: string, descripcion: string) => {
+  const handleAnular = async (id: string, descripcion: string, tipoMovimiento: string) => {
     const result = await Swal.fire({
-      title: '¿Estás seguro?',
-      text: `Eliminarás el registro "${descripcion}". Esta acción no se puede deshacer.`,
+      title: '¿Anular este registro?',
+      text: `Se anulará "${descripcion}". El registro permanecerá visible pero no afectará los totales.`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#ef4444',
+      confirmButtonColor: '#f59e0b',
       cancelButtonColor: '#2A2A2E',
       background: '#161618',
       color: '#fff',
-      confirmButtonText: 'Sí, eliminar',
+      confirmButtonText: 'Sí, anular',
       cancelButtonText: 'Cancelar'
     });
 
     if (result.isConfirmed) {
       try {
-        await eliminarGastoMutation.mutateAsync(id);
-        toast.success("Registro eliminado exitosamente");
+        if (tipoMovimiento === "ingreso") {
+          await anularIngresoMutation.mutateAsync(id);
+        } else {
+          await anularGastoMutation.mutateAsync(id);
+        }
+        toast.success("Registro anulado exitosamente");
       } catch (err: any) {
-        toast.error(err.message || "Error al eliminar registro");
+        toast.error(err.message || "Error al anular registro");
       }
     }
   };
@@ -496,29 +508,47 @@ export function FinanzasDashboard() {
             <AnimatePresence>
               {paginatedData.map((item, idx) => {
                 const isIngreso = item.tipo_movimiento === "ingreso";
+                const isAnulado = item.estado === "anulado";
                 return (
                   <motion.div
                     key={item.id}
                     initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    animate={{ opacity: isAnulado ? 0.55 : 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ delay: idx * 0.03 }}
-                    className="bg-slate-50 dark:bg-[#212124] rounded-xl border border-slate-200 dark:border-[#2A2A2E] p-4 flex flex-col gap-3 shadow-sm hover:border-slate-300 dark:hover:border-[#3A3A3E] transition-all"
+                    className={`bg-slate-50 dark:bg-[#212124] rounded-xl border p-4 flex flex-col gap-3 shadow-sm transition-all ${
+                      isAnulado 
+                        ? 'border-amber-500/30 dark:border-amber-500/20' 
+                        : 'border-slate-200 dark:border-[#2A2A2E] hover:border-slate-300 dark:hover:border-[#3A3A3E]'
+                    }`}
                   >
                     {/* Card Content */}
                     <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${isIngreso ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/10 text-rose-500 dark:text-rose-400'}`}>
-                        {isIngreso ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                        isAnulado 
+                          ? 'bg-amber-500/10 text-amber-500 dark:text-amber-400' 
+                          : isIngreso 
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
+                            : 'bg-rose-500/10 text-rose-500 dark:text-rose-400'
+                      }`}>
+                        {isAnulado ? <Ban className="h-5 w-5" /> : isIngreso ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
                       </div>
                       
                       <div className="flex-1 min-w-0 flex flex-col justify-center">
                         <div className="flex items-start justify-between gap-2">
-                          <h4 className="font-extrabold text-slate-800 dark:text-white text-sm uppercase truncate">
+                          <h4 className={`font-extrabold text-sm uppercase truncate ${isAnulado ? 'line-through text-slate-400 dark:text-gray-500' : 'text-slate-800 dark:text-white'}`}>
                             {item.descripcion}
                           </h4>
-                          <span className="shrink-0 px-2.5 py-0.5 rounded-full text-[9px] font-black tracking-wider bg-slate-100 dark:bg-[#212124] text-slate-500 dark:text-gray-400 uppercase">
-                            {item.categoria || "Sin categoría"}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {isAnulado && (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 uppercase border border-amber-500/20">
+                                Anulado
+                              </span>
+                            )}
+                            <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black tracking-wider bg-slate-100 dark:bg-[#212124] text-slate-500 dark:text-gray-400 uppercase">
+                              {item.categoria || "Sin categoría"}
+                            </span>
+                          </div>
                         </div>
                         
                         <div className="flex flex-wrap items-center justify-between gap-2 mt-1">
@@ -533,7 +563,13 @@ export function FinanzasDashboard() {
                           <div className="flex items-center gap-x-4 text-[11px]">
                             <span className="font-bold text-slate-400 dark:text-gray-500 uppercase">
                               Monto:{" "}
-                              <span className={`font-black ${isIngreso ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-500'}`}>
+                              <span className={`font-black ${
+                                isAnulado 
+                                  ? 'line-through text-slate-400 dark:text-gray-500' 
+                                  : isIngreso 
+                                    ? 'text-emerald-600 dark:text-emerald-400' 
+                                    : 'text-rose-600 dark:text-rose-500'
+                              }`}>
                                 {isIngreso ? '+' : '-'}{formatCurrency(Number(item.monto))}
                               </span>
                             </span>
@@ -546,6 +582,22 @@ export function FinanzasDashboard() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Botón Anular */}
+                      {!isAnulado && (
+                        <button
+                          onClick={() => handleAnular(item.id, item.descripcion, item.tipo_movimiento)}
+                          disabled={anularGastoMutation.isPending || anularIngresoMutation.isPending}
+                          className="p-2 rounded-lg text-slate-400 dark:text-gray-500 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-amber-500/10 transition-all shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Anular registro"
+                        >
+                          {(anularGastoMutation.isPending || anularIngresoMutation.isPending) ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Ban className="h-4 w-4" />
+                          )}
+                        </button>
+                      )}
                     </div>
                   </motion.div>
                 );

@@ -150,45 +150,45 @@ export async function actualizarGasto(id: string, formData: GastoFormValues) {
   }
 }
 
-export async function eliminarGasto(id: string) {
+export async function anularGasto(id: string) {
   const supabase = await createClient();
 
   try {
     const { error } = await supabase
       .from("pro_gastos")
-      .delete()
+      .update({ estado: "anulado", monto: 0 })
       .eq("id", id);
 
     if (error) {
-      console.error("Error al eliminar gasto:", error);
+      console.error("Error al anular gasto:", error);
       return { error: error.message };
     }
 
     revalidatePath("/kore/finanzas");
     return { success: true };
   } catch (error: any) {
-    return { error: error.message || "Error interno al eliminar gasto" };
+    return { error: error.message || "Error interno al anular gasto" };
   }
 }
 
-export async function eliminarIngreso(id: string) {
+export async function anularIngreso(id: string) {
   const supabase = await createClient();
 
   try {
     const { error } = await supabase
       .from("pro_ingresos")
-      .delete()
+      .update({ estado: "anulado", monto: 0 })
       .eq("id", id);
 
     if (error) {
-      console.error("Error al eliminar ingreso:", error);
+      console.error("Error al anular ingreso:", error);
       return { error: error.message };
     }
 
     revalidatePath("/kore/finanzas");
     return { success: true };
   } catch (error: any) {
-    return { error: error.message || "Error interno al eliminar ingreso" };
+    return { error: error.message || "Error interno al anular ingreso" };
   }
 }
 

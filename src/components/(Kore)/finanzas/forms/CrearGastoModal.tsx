@@ -2,8 +2,8 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { finanzasSchema, GastoFormValues, ingresoSchema, IngresoFormValues } from "../lib/zod";
-import { useCrearGasto, useCrearIngreso } from "../lib/hooks";
+import { finanzasSchema, GastoFormValues, ingresoSchema, IngresoFormValues } from "@/components/(Kore)/finanzas/lib/zod";
+import { useCrearGasto, useCrearIngreso } from "@/components/(Kore)/finanzas/lib/hooks";
 import { Loader2, Save, X, DollarSign, Tag, FileText } from "lucide-react";
 import { toast } from "react-toastify";
 

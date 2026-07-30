@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { obtenerFlujoCaja, obtenerGastos, crearGasto, crearIngreso, actualizarGasto, eliminarGasto, eliminarIngreso } from "./actions";
-import { GastoFormValues, IngresoFormValues } from "./zod";
+import { obtenerFlujoCaja, obtenerGastos, crearGasto, crearIngreso, actualizarGasto, anularGasto, anularIngreso } from "@/components/(Kore)/finanzas/lib/actions";
+import { GastoFormValues, IngresoFormValues } from "@/components/(Kore)/finanzas/lib/zod";
 
 // Claves de consulta
 export const finanzasKeys = {
@@ -80,12 +80,12 @@ export function useActualizarGasto() {
   });
 }
 
-// Hook para eliminar un gasto
-export function useEliminarGasto() {
+// Hook para anular un gasto (anulación lógica)
+export function useAnularGasto() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => eliminarGasto(id),
+    mutationFn: (id: string) => anularGasto(id),
     onSuccess: (res) => {
       if (res.error) {
         throw new Error(res.error);
@@ -96,12 +96,12 @@ export function useEliminarGasto() {
   });
 }
 
-// Hook para eliminar un ingreso manual
-export function useEliminarIngreso() {
+// Hook para anular un ingreso manual (anulación lógica)
+export function useAnularIngreso() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => eliminarIngreso(id),
+    mutationFn: (id: string) => anularIngreso(id),
     onSuccess: (res) => {
       if (res.error) {
         throw new Error(res.error);
@@ -110,4 +110,3 @@ export function useEliminarIngreso() {
     },
   });
 }
-
