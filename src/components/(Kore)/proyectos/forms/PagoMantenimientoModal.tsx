@@ -157,6 +157,8 @@ export function PagoMantenimientoModal({ proyecto, onClose, onSuccess }: PagoMan
         showCancelButton: true,
         confirmButtonColor: "#ef4444",
         cancelButtonColor: isDark ? "#27272a" : "#71717a",
+        background: isDark ? "#161618" : "#ffffff",
+        color: isDark ? "#ffffff" : "#1e293b",
         confirmButtonText: "Sí, anular",
         cancelButtonText: "Cancelar",
       });
@@ -186,6 +188,8 @@ export function PagoMantenimientoModal({ proyecto, onClose, onSuccess }: PagoMan
         showCancelButton: true,
         confirmButtonColor: "#00a99d", // celeste-kore equivalent color
         cancelButtonColor: isDark ? "#27272a" : "#71717a",
+        background: isDark ? "#161618" : "#ffffff",
+        color: isDark ? "#ffffff" : "#1e293b",
         confirmButtonText: "Sí, registrar",
         cancelButtonText: "Cancelar",
       });

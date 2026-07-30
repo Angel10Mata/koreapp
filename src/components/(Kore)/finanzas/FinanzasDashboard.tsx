@@ -257,15 +257,17 @@ export function FinanzasDashboard() {
   const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
 
   const handleAnular = async (id: string, descripcion: string, tipoMovimiento: string) => {
+    const isDark = typeof window !== "undefined" && document.documentElement.classList.contains("dark");
+
     const result = await Swal.fire({
       title: '¿Anular este registro?',
       text: `Se anulará "${descripcion}". El registro permanecerá visible pero no afectará los totales.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#f59e0b',
-      cancelButtonColor: '#2A2A2E',
-      background: '#161618',
-      color: '#fff',
+      cancelButtonColor: isDark ? '#2A2A2E' : '#71717a',
+      background: isDark ? '#161618' : '#ffffff',
+      color: isDark ? '#ffffff' : '#1e293b',
       confirmButtonText: 'Sí, anular',
       cancelButtonText: 'Cancelar'
     });
