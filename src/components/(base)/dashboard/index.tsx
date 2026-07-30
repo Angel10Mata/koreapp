@@ -13,7 +13,19 @@ import {
   KeyRound,
 } from "lucide-react";
 
-const MODULES = [
+type Module = {
+  id: string;
+  title: string;
+  subtitle: string;
+  desc: string;
+  icon: string;
+  href: string;
+  allowedRoles?: string[];
+  requiresAdmin?: boolean;
+  colSpan: string;
+};
+
+const MODULES: Module[] = [
   {
     id: "proyectos",
     title: "Gestión de",
