@@ -98,10 +98,21 @@ const formatPaymentDateWithTime = (dateStr: string | null | undefined): string =
 const parsePaymentDescription = (desc: string | null | undefined) => {
   if (!desc) return { cleanDesc: "", username: "Usuario" };
   const parts = desc.split(" | Confirmado por: ");
+  
+  let username = "Usuario";
   if (parts.length > 1) {
-    return { cleanDesc: parts[0], username: parts[1] };
+    username = parts[1].trim();
+    const nameParts = username.split(/\s+/);
+    if (nameParts.length >= 4) {
+      // Asume Nombre1 Nombre2 Apellido1 Apellido2
+      username = `${nameParts[0]} ${nameParts[2]}`;
+    } else if (nameParts.length === 3) {
+      // Asume Nombre Apellido1 Apellido2 o similar
+      username = `${nameParts[0]} ${nameParts[1]}`;
+    }
   }
-  return { cleanDesc: desc, username: "Usuario" };
+  
+  return { cleanDesc: parts[0], username };
 };
 
 export function PagoMantenimientoModal({ proyecto, onClose, onSuccess }: PagoMantenimientoModalProps) {
@@ -186,7 +197,7 @@ export function PagoMantenimientoModal({ proyecto, onClose, onSuccess }: PagoMan
         html: `Se marcará como pagado <strong>${monthName} de ${selectedYear}</strong> por <strong>${formatMoney(sugerido)}</strong>.`,
         icon: "question",
         showCancelButton: true,
-        confirmButtonColor: "#00a99d", // celeste-kore equivalent color
+        confirmButtonColor: "#22c55e", // green-500 equivalent color
         cancelButtonColor: isDark ? "#27272a" : "#71717a",
         background: isDark ? "#161618" : "#ffffff",
         color: isDark ? "#ffffff" : "#1e293b",
@@ -230,9 +241,14 @@ export function PagoMantenimientoModal({ proyecto, onClose, onSuccess }: PagoMan
       onClose={onClose}
       title="Registrar Pago"
       subtitle={proyecto.nombre}
-      maxWidth="md"
+      maxWidth="5xl"
+      footer={
+        <ModalFooter>
+          <ModalSubmit text="Cerrar" onClick={onClose} type="button" />
+        </ModalFooter>
+      }
     >
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6 h-full">
         {/* Year Picker Panel */}
         <div className="flex flex-col items-center justify-center gap-2">
           <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground select-none">Año de Pago</span>
@@ -303,7 +319,7 @@ export function PagoMantenimientoModal({ proyecto, onClose, onSuccess }: PagoMan
             <span className="text-[10px] font-black uppercase tracking-widest">Cargando Historial...</span>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-3 flex-1">
             {months.map((m, idx) => {
               const periodKey = `${selectedYear}-${String(idx + 1).padStart(2, "0")}`;
               const isBeforeStart = startYear !== null && startMonth !== null && (
@@ -321,34 +337,34 @@ export function PagoMantenimientoModal({ proyecto, onClose, onSuccess }: PagoMan
                   whileHover={{ scale: isBeforeStart ? 1 : 1.05 }}
                   whileTap={{ scale: isBeforeStart ? 1 : 0.95 }}
                   className={cn(
-                    "py-2 px-1 rounded-xl border flex flex-col items-center transition-all h-[105px] text-center relative overflow-hidden select-none",
+                    "py-2 px-1 rounded-xl border flex flex-col items-center transition-all h-full min-h-[105px] text-center relative overflow-hidden select-none",
                     isBeforeStart
-                      ? "bg-zinc-50 dark:bg-zinc-900/20 border-zinc-200 dark:border-zinc-800/40 text-zinc-400 dark:text-zinc-600 cursor-not-allowed justify-center"
+                      ? "bg-red-500/5 dark:bg-red-900/10 border-red-200 dark:border-red-900/30 text-red-400 dark:text-red-500 cursor-not-allowed justify-center"
                       : isPaid
-                        ? "bg-celeste-kore/20 border-celeste-kore text-celeste-kore font-black"
-                        : "bg-zinc-100/60 dark:bg-zinc-900/40 border-zinc-300 dark:border-zinc-800/80 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200/50 dark:hover:bg-zinc-900/60 hover:border-zinc-400 dark:hover:border-zinc-700 cursor-pointer justify-center"
+                        ? "bg-green-500/10 border-green-500/40 text-green-500 font-black"
+                        : "bg-yellow-500/10 dark:bg-yellow-500/5 border-yellow-500/30 text-yellow-600 dark:text-yellow-500 hover:bg-yellow-500/20 hover:border-yellow-500/50 cursor-pointer justify-center"
                   )}
                 >
-                  <div className="flex-1 flex flex-col items-center justify-center gap-0.5">
-                    <span className="text-[10px] font-black uppercase tracking-wider leading-none">{m.slice(0, 3)}</span>
+                  <div className="flex-1 flex flex-col items-center justify-center gap-1">
+                    <span className="text-sm sm:text-base font-black uppercase tracking-wider leading-none">{m.slice(0, 3)}</span>
                     
                     {isBeforeStart && (
-                      <span className="text-[8px] font-bold text-zinc-400/80 dark:text-zinc-600/80 uppercase tracking-widest leading-none mt-1">N/A</span>
+                      <span className="text-[10px] sm:text-xs font-bold text-red-400/80 dark:text-red-500/80 uppercase tracking-widest leading-none mt-1">N/A</span>
                     )}
                     {isPaid && (
-                      <span className="text-[8px] font-black bg-celeste-kore/20 text-celeste-kore px-1.5 py-0.5 rounded uppercase tracking-widest leading-none mt-0.5">Pagado</span>
+                      <span className="text-[10px] sm:text-[11px] font-black bg-green-500/20 text-green-500 px-2 py-1 rounded uppercase tracking-widest leading-none mt-1">Pagado</span>
                     )}
                     {!isBeforeStart && !isPaid && (
-                      <span className="text-[8px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest leading-none mt-1">Pendiente</span>
+                      <span className="text-[10px] sm:text-[11px] font-bold text-yellow-600 dark:text-yellow-500 uppercase tracking-widest leading-none mt-1">Pendiente</span>
                     )}
                   </div>
 
                   {isPaid && (
-                    <div className="flex flex-col items-center w-full mb-0.5 border-t border-celeste-kore/25 pt-1 mt-auto">
-                      <span className="text-[7.5px] font-medium leading-tight text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis w-full px-0.5">
+                    <div className="flex flex-col items-center w-full mb-1 border-t border-green-500/25 pt-1.5 mt-auto">
+                      <span className="text-[9px] sm:text-[10px] font-medium leading-tight text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis w-full px-1">
                         {formatPaymentDateWithTime(payment.fecha_pago)}
                       </span>
-                      <span className="text-[7.5px] font-bold leading-tight text-foreground whitespace-nowrap overflow-hidden text-ellipsis w-full px-0.5">
+                      <span className="text-[9px] sm:text-[10px] font-bold leading-tight text-foreground whitespace-nowrap overflow-hidden text-ellipsis w-full px-1 mt-0.5">
                         {parsePaymentDescription(payment.descripcion).username}
                       </span>
                     </div>
@@ -360,30 +376,22 @@ export function PagoMantenimientoModal({ proyecto, onClose, onSuccess }: PagoMan
         )}
 
         {/* Legends */}
-        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 pt-2 text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-muted-foreground select-none">
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 pt-2 pb-2 text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-muted-foreground select-none mt-auto">
           <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded bg-zinc-50 dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-800/40"></div>
+            <div className="w-2.5 h-2.5 rounded bg-red-500/10 border border-red-500/40"></div>
             <span>No aplica</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded bg-celeste-kore/20 border border-celeste-kore"></div>
+            <div className="w-2.5 h-2.5 rounded bg-green-500/20 border border-green-500"></div>
             <span>Pagado</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded bg-zinc-100/60 dark:bg-zinc-900/40 border border-zinc-300 dark:border-zinc-800/80"></div>
+            <div className="w-2.5 h-2.5 rounded bg-yellow-500/20 border border-yellow-500"></div>
             <span>Pendiente</span>
           </div>
         </div>
       </div>
       
-      {/* 
-        This modal is mainly for visualization and quick actions (inline).
-        Normally forms use <form> and ModalFooter. 
-        Here we use a generic close button since state is handled inline.
-      */}
-      <ModalFooter>
-        <ModalSubmit text="Cerrar" onClick={onClose} type="button" />
-      </ModalFooter>
     </ModalShell>
   );
 }

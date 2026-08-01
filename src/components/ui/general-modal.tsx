@@ -16,7 +16,9 @@ export interface ModalShellProps {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
-  maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl";
+  footer?: React.ReactNode;
+  maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl" | "6xl" | "7xl";
+  fullScreen?: boolean;
 }
 
 const MAX_WIDTHS = {
@@ -25,6 +27,11 @@ const MAX_WIDTHS = {
   lg: "sm:max-w-lg",
   xl: "sm:max-w-xl",
   "2xl": "sm:max-w-2xl",
+  "3xl": "sm:max-w-3xl",
+  "4xl": "sm:max-w-4xl",
+  "5xl": "sm:max-w-5xl",
+  "6xl": "sm:max-w-6xl",
+  "7xl": "sm:max-w-7xl",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -37,7 +44,9 @@ export function ModalShell({
   title,
   subtitle,
   children,
+  footer,
   maxWidth = "md",
+  fullScreen = false,
 }: ModalShellProps) {
   const [mounted, setMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -93,10 +102,11 @@ export function ModalShell({
             exit={{ opacity: 0, y: 30, scale: 0.95 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             className={cn(
-              "relative flex flex-col w-full h-[100dvh] sm:h-auto sm:max-h-[90vh]",
-              "sm:rounded-3xl shadow-xl overflow-hidden",
-              "sm:p-[3px]", // Space for the animated border
-              MAX_WIDTHS[maxWidth]
+              "relative flex flex-col w-full h-[100dvh]",
+              !fullScreen && "sm:h-auto sm:max-h-[90vh] sm:rounded-3xl sm:p-[3px] shadow-xl",
+              fullScreen && "sm:h-screen sm:w-screen sm:max-w-none sm:max-h-screen sm:rounded-none",
+              !fullScreen && MAX_WIDTHS[maxWidth],
+              "overflow-hidden"
             )}
           >
             {/* Animated Border (Desktop Only) */}
@@ -108,7 +118,7 @@ export function ModalShell({
             />
 
             {/* Content Area (Covers the animated border except for the 3px padding) */}
-            <div className="relative flex flex-col flex-1 sm:rounded-[22px] overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+            <div className={cn("relative flex flex-col flex-1 overflow-hidden bg-zinc-100 dark:bg-zinc-800", !fullScreen && "sm:rounded-[22px]")}>
               
               {/* Header */}
               <div className="flex items-start justify-between px-6 pt-6 pb-4 pt-safe shrink-0 bg-zinc-100 dark:bg-zinc-800">
@@ -134,6 +144,9 @@ export function ModalShell({
               <div className="flex-1 overflow-y-auto px-6 py-4 bg-zinc-100 dark:bg-zinc-900 custom-scrollbar">
                 {children}
               </div>
+
+              {/* Footer */}
+              {footer}
             </div>
           </motion.div>
         </div>
@@ -238,9 +251,9 @@ export const ModalSubmit = React.forwardRef<
     type="submit"
     disabled={disabled || isLoading}
     className={cn(
-      "inline-flex h-11 items-center justify-center rounded-xl border-2 border-emerald-600 dark:border-emerald-400 bg-transparent px-8 py-2 text-sm font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 shadow-sm transition-all outline-none cursor-pointer",
-      "hover:bg-emerald-600/10 hover:shadow-md active:scale-95",
-      "focus-visible:ring-4 focus-visible:ring-emerald-600/20",
+      "inline-flex h-11 items-center justify-center rounded-xl border-2 border-celeste-kore bg-transparent px-8 py-2 text-sm font-black uppercase tracking-widest text-celeste-kore shadow-sm transition-all outline-none cursor-pointer",
+      "hover:bg-celeste-kore/10 hover:shadow-md active:scale-95",
+      "focus-visible:ring-4 focus-visible:ring-celeste-kore/20",
       "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100",
       className
     )}

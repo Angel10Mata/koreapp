@@ -166,7 +166,7 @@ export function QRProyectoView() {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-6 px-4 pt-32 pb-16 md:px-8 md:pt-20">
+    <div className="w-full max-w-5xl mx-auto space-y-6 px-2 pt-32 pb-8 md:px-4 md:pt-28">
       <title>{`Código QR: ${proyecto.nombre} | KORE BMS`}</title>
 
       {/* HEADER SECTION */}

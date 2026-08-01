@@ -15,11 +15,18 @@ import {
   Plus,
   ChevronLeft,
   ChevronRight,
-  Ban
+  Ban,
+  MoreVertical
 } from "lucide-react";
 import { useFlujoCaja, useAnularGasto, useAnularIngreso } from "@/components/(Kore)/finanzas/lib/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 import { 
   Select, 
   SelectContent, 
@@ -28,6 +35,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { CrearGastoModal } from "@/components/(Kore)/finanzas/forms/CrearGastoModal";
+import { FinanzasChart } from "@/components/(Kore)/finanzas/FinanzasChart";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
 
@@ -150,6 +158,11 @@ export function FinanzasDashboard() {
   const [filterMovimiento, setFilterMovimiento] = useState<"todos" | "ingreso" | "egreso">("todos");
   const [isCrearModalOpen, setIsCrearModalOpen] = useState(false);
   const [modalTipo, setModalTipo] = useState<"ingreso" | "gasto">("gasto");
+  
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   // Date filter state
   const [filterPeriod, setFilterPeriod] = useState<"dia" | "mes" | "rango">("mes");
@@ -300,18 +313,24 @@ export function FinanzasDashboard() {
     );
   }
 
+  if (!mounted) {
+    return (
+      <div className="w-full flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-celeste-kore" />
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full max-w-7xl mx-auto px-2 pt-32 pb-16 md:px-8 md:pt-24 space-y-8 text-slate-900 dark:text-white font-sans">
+    <div className="w-full max-w-5xl mx-auto px-2 pt-32 pb-8 md:px-4 md:pt-28 space-y-8 text-slate-900 dark:text-white font-sans">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-slate-50 dark:bg-[#212124] rounded-xl border border-slate-200 dark:border-[#2A2A2E]">
-            <Wallet className="h-7 w-7 text-celeste-kore" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">Control Financiero</h1>
-            <p className="text-sm text-slate-500 dark:text-gray-400 font-medium mt-1">Ingresos, egresos, balance y cuentas pendientes</p>
+          <div className="flex flex-col">
+            <h1 className="text-xl sm:text-4xl font-black tracking-tight mt-0.5 sm:mt-1 leading-none uppercase">
+              CONTROL <span className="text-destructive">FINANCIERO</span>
+            </h1>
           </div>
         </div>
         <div className="flex flex-row items-center gap-3 w-full sm:w-auto">
@@ -320,7 +339,7 @@ export function FinanzasDashboard() {
               setModalTipo("ingreso");
               setIsCrearModalOpen(true);
             }}
-            className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-full transition-all text-sm font-semibold tracking-wide"
+            className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-full transition-all text-sm font-semibold tracking-wide"
           >
             + Ingreso
           </button>
@@ -329,124 +348,138 @@ export function FinanzasDashboard() {
               setModalTipo("gasto");
               setIsCrearModalOpen(true);
             }}
-            className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-full transition-all text-sm font-semibold tracking-wide shadow-md shadow-rose-950/20"
+            className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 rounded-full transition-all text-sm font-semibold tracking-wide"
           >
             + Egreso
           </button>
         </div>
       </div>
 
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-3 gap-2.5 md:gap-6">
-        
-        {/* Card 1: Ingresos */}
-        <motion.div
-          whileHover={{ y: -4, borderColor: "rgba(16,185,129,0.35)", boxShadow: "0 10px 30px -10px rgba(16,185,129,0.08)" }}
-          className="bg-gradient-to-br from-white to-slate-50/50 dark:from-[#1c1c1f] dark:to-[#121214] border border-slate-200 dark:border-[#2A2A2E] rounded-2xl p-3 sm:p-5 flex flex-col justify-between h-[115px] sm:h-[135px] transition-all duration-300 cursor-pointer shadow-sm w-full"
-        >
-          <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 w-fit">
-            <ArrowUpRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-          </div>
-          <div className="flex flex-col text-left">
-            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-gray-400">Total Ingresos</span>
-            {isLoading ? (
-              <Skeleton className="h-6 w-16 sm:w-32 bg-slate-100 dark:bg-[#2A2A2E] mt-1" />
-            ) : (
-              <div className="text-[13px] sm:text-xl md:text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight mt-0.5 sm:mt-1">
-                {formatCurrency(metricas.ingresos)}
-              </div>
-            )}
-          </div>
-        </motion.div>
+      {/* ── Panel de métricas + filtros + gráfica ─────────────────────── */}
+      <div className="bg-white dark:bg-[#161618] border border-slate-200 dark:border-[#2A2A2E] rounded-2xl p-4 sm:p-6 flex flex-col gap-5 shadow-sm">
 
-        {/* Card 2: Egresos */}
-        <motion.div
-          whileHover={{ y: -4, borderColor: "rgba(244,63,94,0.35)", boxShadow: "0 10px 30px -10px rgba(244,63,94,0.08)" }}
-          className="bg-gradient-to-br from-white to-slate-50/50 dark:from-[#1c1c1f] dark:to-[#121214] border border-slate-200 dark:border-[#2A2A2E] rounded-2xl p-3 sm:p-5 flex flex-col justify-between h-[115px] sm:h-[135px] transition-all duration-300 cursor-pointer shadow-sm w-full"
-        >
-          <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-rose-500/10 text-rose-500 dark:text-rose-400 w-fit">
-            <ArrowDownRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-          </div>
-          <div className="flex flex-col text-left">
-            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-gray-400">Total Egresos</span>
-            {isLoading ? (
-              <Skeleton className="h-6 w-16 sm:w-32 bg-slate-100 dark:bg-[#2A2A2E] mt-1" />
-            ) : (
-              <div className="text-[13px] sm:text-xl md:text-2xl font-black text-rose-600 dark:text-rose-500 tracking-tight mt-0.5 sm:mt-1">
-                {formatCurrency(metricas.egresos)}
-              </div>
-            )}
-          </div>
-        </motion.div>
+        {/* Metrics Cards */}
+        <div className="grid grid-cols-3 gap-2.5 md:gap-4">
+          
+          {/* Card 1: Ingresos */}
+          <motion.div
+            whileHover={{ y: -4, borderColor: "rgba(16,185,129,0.35)", boxShadow: "0 10px 30px -10px rgba(16,185,129,0.08)" }}
+            className="bg-gradient-to-br from-white to-slate-50/50 dark:from-[#212124] dark:to-[#1a1a1d] border border-slate-200 dark:border-[#2A2A2E] rounded-2xl p-3 sm:p-5 flex flex-col justify-between h-[115px] sm:h-[135px] transition-all duration-300 cursor-pointer shadow-sm w-full"
+          >
+            <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 w-fit">
+              <ArrowUpRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-gray-400">Total Ingresos</span>
+              {isLoading ? (
+                <Skeleton className="h-6 w-16 sm:w-32 bg-slate-100 dark:bg-[#2A2A2E] mt-1" />
+              ) : (
+                <div className="text-[13px] sm:text-xl md:text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight mt-0.5 sm:mt-1">
+                  {formatCurrency(metricas.ingresos)}
+                </div>
+              )}
+            </div>
+          </motion.div>
 
-        {/* Card 3: Balance Total */}
-        <motion.div
-          whileHover={{ y: -4, borderColor: "rgba(183,73,78,0.45)", boxShadow: "0 10px 30px -10px rgba(183,73,78,0.12)" }}
-          className="bg-gradient-to-br from-white to-[#fff9f9] dark:from-[#1c1213] dark:to-[#121214] border border-celeste-kore/20 dark:border-celeste-kore/30 rounded-2xl p-3 sm:p-5 flex flex-col justify-between h-[115px] sm:h-[135px] transition-all duration-300 relative overflow-hidden cursor-pointer shadow-sm w-full"
-        >
-          <div className="absolute top-0 right-0 w-24 h-24 bg-celeste-kore/5 rounded-full blur-2xl pointer-events-none" />
-          <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 w-fit">
-            <Wallet className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-          </div>
-          <div className="flex flex-col text-left">
-            <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-gray-400">Balance Total</span>
-            {isLoading ? (
-              <Skeleton className="h-6 w-16 sm:w-32 bg-slate-100 dark:bg-[#2A2A2E] mt-1" />
-            ) : (
-              <div className="text-[13px] sm:text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-0.5 sm:mt-1">
-                {metricas.balance < 0 ? "-" : ""}{formatCurrency(metricas.balance)}
-              </div>
-            )}
-          </div>
-        </motion.div>
+          {/* Card 2: Egresos */}
+          <motion.div
+            whileHover={{ y: -4, borderColor: "rgba(244,63,94,0.35)", boxShadow: "0 10px 30px -10px rgba(244,63,94,0.08)" }}
+            className="bg-gradient-to-br from-white to-slate-50/50 dark:from-[#212124] dark:to-[#1a1a1d] border border-slate-200 dark:border-[#2A2A2E] rounded-2xl p-3 sm:p-5 flex flex-col justify-between h-[115px] sm:h-[135px] transition-all duration-300 cursor-pointer shadow-sm w-full"
+          >
+            <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-rose-500/10 text-rose-500 dark:text-rose-400 w-fit">
+              <ArrowDownRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-gray-400">Total Egresos</span>
+              {isLoading ? (
+                <Skeleton className="h-6 w-16 sm:w-32 bg-slate-100 dark:bg-[#2A2A2E] mt-1" />
+              ) : (
+                <div className="text-[13px] sm:text-xl md:text-2xl font-black text-rose-600 dark:text-rose-500 tracking-tight mt-0.5 sm:mt-1">
+                  {formatCurrency(metricas.egresos)}
+                </div>
+              )}
+            </div>
+          </motion.div>
 
-      </div>
+          {/* Card 3: Balance Total */}
+          <motion.div
+            whileHover={{ y: -4, borderColor: "rgba(183,73,78,0.45)", boxShadow: "0 10px 30px -10px rgba(183,73,78,0.12)" }}
+            className="bg-gradient-to-br from-white to-[#fff9f9] dark:from-[#1c1213] dark:to-[#121214] border border-celeste-kore/20 dark:border-celeste-kore/30 rounded-2xl p-3 sm:p-5 flex flex-col justify-between h-[115px] sm:h-[135px] transition-all duration-300 relative overflow-hidden cursor-pointer shadow-sm w-full"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 bg-celeste-kore/5 rounded-full blur-2xl pointer-events-none" />
+            <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 w-fit">
+              <Wallet className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-gray-400">Balance Total</span>
+              {isLoading ? (
+                <Skeleton className="h-6 w-16 sm:w-32 bg-slate-100 dark:bg-[#2A2A2E] mt-1" />
+              ) : (
+                <div className="text-[13px] sm:text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-0.5 sm:mt-1">
+                  {metricas.balance < 0 ? "-" : ""}{formatCurrency(metricas.balance)}
+                </div>
+              )}
+            </div>
+          </motion.div>
 
-      {/* Rango (Filtros de Fecha) */}
-      <div className="flex items-center gap-2 text-sm font-medium flex-wrap">
-        <div className="flex bg-white dark:bg-[#161618] border border-slate-200 dark:border-[#2A2A2E] rounded-lg overflow-hidden shrink-0">
-          <button 
-            onClick={() => setFilterPeriod("dia")}
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${filterPeriod === "dia" ? "bg-celeste-kore/10 text-celeste-kore font-black" : "hover:bg-slate-50 dark:hover:bg-[#212124] text-slate-500 dark:text-gray-400"}`}
-          >Día</button>
-          <button 
-            onClick={() => setFilterPeriod("mes")}
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors border-l border-slate-200 dark:border-[#2A2A2E] ${filterPeriod === "mes" ? "bg-celeste-kore/10 text-celeste-kore font-black" : "hover:bg-slate-50 dark:hover:bg-[#212124] text-slate-500 dark:text-gray-400"}`}
-          >Mes</button>
-          <button 
-            onClick={() => setFilterPeriod("rango")}
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors border-l border-slate-200 dark:border-[#2A2A2E] ${filterPeriod === "rango" ? "bg-celeste-kore/10 text-celeste-kore font-black" : "hover:bg-slate-50 dark:hover:bg-[#212124] text-slate-500 dark:text-gray-400"}`}
-          >Rango</button>
         </div>
 
-        {filterPeriod === "dia" && (
-          <div className="flex items-center justify-center w-full sm:w-auto mt-2 sm:mt-0">
-            <CustomDatePicker value={dateDia} onChange={setDateDia} align="center" />
+        {/* Filtros de Fecha */}
+        <div className="flex items-center justify-center gap-2 text-sm font-medium flex-wrap w-full">
+          <div className="flex bg-slate-50 dark:bg-[#212124] border border-slate-200 dark:border-[#2A2A2E] rounded-lg overflow-hidden shrink-0">
+            <button 
+              onClick={() => setFilterPeriod("dia")}
+              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${filterPeriod === "dia" ? "bg-celeste-kore/10 text-celeste-kore font-black" : "hover:bg-slate-100 dark:hover:bg-[#2A2A2E] text-slate-500 dark:text-gray-400"}`}
+            >Día</button>
+            <button 
+              onClick={() => setFilterPeriod("mes")}
+              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors border-l border-slate-200 dark:border-[#2A2A2E] ${filterPeriod === "mes" ? "bg-celeste-kore/10 text-celeste-kore font-black" : "hover:bg-slate-100 dark:hover:bg-[#2A2A2E] text-slate-500 dark:text-gray-400"}`}
+            >Mes</button>
+            <button 
+              onClick={() => setFilterPeriod("rango")}
+              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors border-l border-slate-200 dark:border-[#2A2A2E] ${filterPeriod === "rango" ? "bg-celeste-kore/10 text-celeste-kore font-black" : "hover:bg-slate-100 dark:hover:bg-[#2A2A2E] text-slate-500 dark:text-gray-400"}`}
+            >Rango</button>
           </div>
-        )}
 
-        {filterPeriod === "mes" && (
-          <div className="flex items-center justify-center w-full sm:w-auto mt-2 sm:mt-0">
-            <CustomMonthPicker value={dateMes} onChange={setDateMes} />
-          </div>
-        )}
+          {filterPeriod === "dia" && (
+            <div className="flex items-center justify-center w-full sm:w-auto mt-2 sm:mt-0">
+              <CustomDatePicker value={dateDia} onChange={setDateDia} align="center" />
+            </div>
+          )}
 
-        {filterPeriod === "rango" && (
-          <div className="flex items-center justify-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-            <CustomDatePicker 
-              value={dateRango.start} 
-              onChange={(v) => setDateRango(prev => ({ ...prev, start: v }))} 
-              align="start"
-            />
-            <span className="text-slate-400 dark:text-gray-500 font-bold">-</span>
-            <CustomDatePicker 
-              value={dateRango.end} 
-              onChange={(v) => setDateRango(prev => ({ ...prev, end: v }))} 
-              align="end"
-            />
-          </div>
-        )}
-      </div>
+          {filterPeriod === "mes" && (
+            <div className="flex items-center justify-center w-full sm:w-auto mt-2 sm:mt-0">
+              <CustomMonthPicker value={dateMes} onChange={setDateMes} />
+            </div>
+          )}
+
+          {filterPeriod === "rango" && (
+            <div className="flex items-center justify-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+              <CustomDatePicker 
+                value={dateRango.start} 
+                onChange={(v) => setDateRango(prev => ({ ...prev, start: v }))} 
+                align="start"
+              />
+              <span className="text-slate-400 dark:text-gray-500 font-bold">-</span>
+              <CustomDatePicker 
+                value={dateRango.end} 
+                onChange={(v) => setDateRango(prev => ({ ...prev, end: v }))} 
+                align="end"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Chart: Ingresos vs Egresos */}
+        <FinanzasChart
+          data={flujoCaja as any ?? []}
+          filterPeriod={filterPeriod}
+          dateDia={dateDia}
+          dateMes={dateMes}
+          dateRango={dateRango}
+        />
+
+      </div>{/* fin panel */}
 
       {/* Toolbar - Search & Filter */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white dark:bg-[#161618] p-3 rounded-2xl border border-slate-200 dark:border-[#2A2A2E]">
@@ -462,19 +495,19 @@ export function FinanzasDashboard() {
         </div>        <div className="flex items-center bg-slate-50 dark:bg-[#212124] border border-slate-200 dark:border-transparent rounded-xl p-1 w-full sm:w-auto overflow-x-auto">
           <button
             onClick={() => setFilterMovimiento("todos")}
-            className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all border ${filterMovimiento === "todos" ? "bg-slate-900/5 dark:bg-white/10 text-slate-900 dark:text-white border-slate-400 dark:border-white shadow-sm" : "border-transparent text-slate-400 dark:text-gray-500 hover:text-slate-800 dark:hover:text-gray-300"}`}
+            className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all border ${filterMovimiento === "todos" ? "bg-celeste-kore/10 text-celeste-kore border-celeste-kore/30 shadow-sm" : "border-transparent text-slate-400 dark:text-gray-500 hover:text-slate-800 dark:hover:text-gray-300"}`}
           >
             Todos
           </button>
           <button
             onClick={() => setFilterMovimiento("ingreso")}
-            className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all border ${filterMovimiento === "ingreso" ? "bg-slate-900/5 dark:bg-white/10 text-slate-900 dark:text-white border-slate-400 dark:border-white shadow-sm" : "border-transparent text-slate-400 dark:text-gray-500 hover:text-slate-800 dark:hover:text-gray-300"}`}
+            className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all border ${filterMovimiento === "ingreso" ? "bg-celeste-kore/10 text-celeste-kore border-celeste-kore/30 shadow-sm" : "border-transparent text-slate-400 dark:text-gray-500 hover:text-slate-800 dark:hover:text-gray-300"}`}
           >
             Ingreso
           </button>
           <button
             onClick={() => setFilterMovimiento("egreso")}
-            className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all border ${filterMovimiento === "egreso" ? "bg-slate-900/5 dark:bg-white/10 text-slate-900 dark:text-white border-slate-400 dark:border-white shadow-sm" : "border-transparent text-slate-400 dark:text-gray-500 hover:text-slate-800 dark:hover:text-gray-300"}`}
+            className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all border ${filterMovimiento === "egreso" ? "bg-celeste-kore/10 text-celeste-kore border-celeste-kore/30 shadow-sm" : "border-transparent text-slate-400 dark:text-gray-500 hover:text-slate-800 dark:hover:text-gray-300"}`}
           >
             Egreso
           </button>
@@ -521,26 +554,37 @@ export function FinanzasDashboard() {
                     className={`bg-slate-50 dark:bg-[#212124] rounded-xl border p-4 flex flex-col gap-3 shadow-sm transition-all ${
                       isAnulado 
                         ? 'border-amber-500/30 dark:border-amber-500/20' 
-                        : 'border-slate-200 dark:border-[#2A2A2E] hover:border-slate-300 dark:hover:border-[#3A3A3E]'
+                        : isIngreso 
+                          ? 'border-emerald-500/40 dark:border-emerald-500/30 hover:border-emerald-500/60 dark:hover:border-emerald-500/50' 
+                          : 'border-rose-500/40 dark:border-rose-500/30 hover:border-rose-500/60 dark:hover:border-rose-500/50'
                     }`}
                   >
                     {/* Card Content */}
                     <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-                        isAnulado 
-                          ? 'bg-amber-500/10 text-amber-500 dark:text-amber-400' 
-                          : isIngreso 
-                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
-                            : 'bg-rose-500/10 text-rose-500 dark:text-rose-400'
-                      }`}>
-                        {isAnulado ? <Ban className="h-5 w-5" /> : isIngreso ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
-                      </div>
-                      
-                      <div className="flex-1 min-w-0 flex flex-col justify-center">
+                      <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
                         <div className="flex items-start justify-between gap-2">
-                          <h4 className={`font-extrabold text-sm uppercase truncate ${isAnulado ? 'line-through text-slate-400 dark:text-gray-500' : 'text-slate-800 dark:text-white'}`}>
+                          <h4 className={`font-extrabold text-xs uppercase line-clamp-2 leading-snug pr-2 ${isAnulado ? 'line-through text-slate-400 dark:text-gray-500' : 'text-slate-800 dark:text-white'}`}>
                             {item.descripcion}
                           </h4>
+                          <span className={`font-black text-sm shrink-0 tracking-tight ${
+                            isAnulado 
+                              ? 'line-through text-slate-400 dark:text-gray-500' 
+                              : isIngreso 
+                                ? 'text-emerald-600 dark:text-emerald-400' 
+                                : 'text-rose-600 dark:text-rose-500'
+                          }`}>
+                            {isIngreso ? '+' : '-'}{formatCurrency(Number(item.monto))}
+                          </span>
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 dark:text-gray-500 font-medium">
+                            {new Date(item.fecha).toLocaleString("es-GT", { 
+                              day: '2-digit', month: 'short', year: 'numeric', 
+                              hour: '2-digit', minute: '2-digit' 
+                            })}
+                          </div>
+                          
                           <div className="flex items-center gap-1.5 shrink-0">
                             {isAnulado && (
                               <span className="px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 uppercase border border-amber-500/20">
@@ -552,53 +596,31 @@ export function FinanzasDashboard() {
                             </span>
                           </div>
                         </div>
-                        
-                        <div className="flex flex-wrap items-center justify-between gap-2 mt-1">
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 dark:text-gray-500 font-medium">
-                            <Calendar className="h-3.5 w-3.5 opacity-70" />
-                            {new Date(item.fecha).toLocaleString("es-GT", { 
-                              day: '2-digit', month: 'short', year: 'numeric', 
-                              hour: '2-digit', minute: '2-digit' 
-                            })}
-                          </div>
-                          
-                          <div className="flex items-center gap-x-4 text-[11px]">
-                            <span className="font-bold text-slate-400 dark:text-gray-500 uppercase">
-                              Monto:{" "}
-                              <span className={`font-black ${
-                                isAnulado 
-                                  ? 'line-through text-slate-400 dark:text-gray-500' 
-                                  : isIngreso 
-                                    ? 'text-emerald-600 dark:text-emerald-400' 
-                                    : 'text-rose-600 dark:text-rose-500'
-                              }`}>
-                                {isIngreso ? '+' : '-'}{formatCurrency(Number(item.monto))}
-                              </span>
-                            </span>
-                            <span className="font-bold text-slate-400 dark:text-gray-500 uppercase">
-                              Saldo:{" "}
-                              <span className="text-slate-700 dark:text-gray-300 font-extrabold">
-                                {formatCurrency(item.saldo)}
-                              </span>
-                            </span>
-                          </div>
-                        </div>
                       </div>
 
-                      {/* Botón Anular */}
+                      {/* Menú de opciones */}
                       {!isAnulado && (
-                        <button
-                          onClick={() => handleAnular(item.id, item.descripcion, item.tipo_movimiento)}
-                          disabled={anularGastoMutation.isPending || anularIngresoMutation.isPending}
-                          className="p-2 rounded-lg text-slate-400 dark:text-gray-500 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-amber-500/10 transition-all shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Anular registro"
-                        >
-                          {(anularGastoMutation.isPending || anularIngresoMutation.isPending) ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Ban className="h-4 w-4" />
-                          )}
-                        </button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="p-2 rounded-lg text-slate-400 dark:text-gray-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#3A3A3E] transition-all shrink-0 focus:outline-none">
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40 border-slate-200 dark:border-[#2A2A2E] bg-white dark:bg-[#161618] rounded-xl shadow-lg p-1">
+                            <DropdownMenuItem 
+                              onClick={() => handleAnular(item.id, item.descripcion, item.tipo_movimiento)}
+                              disabled={anularGastoMutation.isPending || anularIngresoMutation.isPending}
+                              className="text-rose-600 dark:text-rose-500 focus:text-rose-600 dark:focus:text-rose-500 focus:bg-rose-50 dark:focus:bg-rose-500/10 font-bold text-xs cursor-pointer gap-2 rounded-lg py-2"
+                            >
+                              {(anularGastoMutation.isPending || anularIngresoMutation.isPending) ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Ban className="h-4 w-4" />
+                              )}
+                              Anular
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                     </div>
                   </motion.div>

@@ -331,10 +331,10 @@ export default function Menu({ isOpen, setIsOpen, user }: MenuProps) {
               <div className="mb-4">
                 <button
                   onClick={handleLogout}
-                  className="flex items-center justify-between rounded-xl bg-red-500 dark:bg-red-600 text-white px-5 py-3 text-sm font-bold w-full hover:bg-red-600 dark:hover:bg-red-700 transition-all cursor-pointer mt-4"
+                  className="flex items-center justify-between rounded-xl bg-celeste-kore/10 border border-celeste-kore/50 px-4 py-3 text-sm font-bold w-full hover:bg-celeste-kore/20 transition-all cursor-pointer mt-4"
                 >
-                  <span className="text-white">Cerrar Sesión</span>
-                  <LogOut className="size-4 rotate-180 text-white" />
+                  <span className="text-red-700 font-bold">Cerrar Sesión</span>
+                  <LogOut className="size-5 rotate-180 text-red-700" />
                 </button>
               </div>
             </>

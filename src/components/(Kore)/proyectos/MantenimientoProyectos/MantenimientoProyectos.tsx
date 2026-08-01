@@ -242,7 +242,7 @@ export default function MantenimientoProyectos() {
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col gap-6 text-foreground px-4 pt-32 pb-16 md:px-8 md:pt-24 relative overflow-x-hidden">
+    <div className="w-full max-w-5xl mx-auto flex flex-col gap-6 text-foreground px-2 pt-32 pb-8 md:px-4 md:pt-28 relative overflow-x-hidden">
       {/* Decorative glow */}
       <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] bg-celeste-kore/10 rounded-full blur-[120px] pointer-events-none -z-10 animate-pulse" />
       <div className="absolute bottom-[10%] right-[-5%] w-[30%] h-[30%] bg-amber-500/5 rounded-full blur-[100px] pointer-events-none -z-10" />
@@ -264,7 +264,7 @@ export default function MantenimientoProyectos() {
 
 
       {/* ── TABLE ──────────────────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-red-500/20 dark:border-white/10 bg-white dark:bg-black backdrop-blur-xl shadow-none dark:shadow-2xl dark:shadow-black/20 overflow-hidden">
+      <div className="rounded-2xl border border-celeste-kore/55 dark:border-border bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-xl shadow-none dark:shadow-2xl dark:shadow-black/20 overflow-hidden">
         <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-border/50">
           <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20">
             <Wrench size={16} className="text-red-500" />
@@ -319,7 +319,10 @@ export default function MantenimientoProyectos() {
                         exit={{ opacity: 0 }}
                         transition={{ delay: idx * 0.03 }}
                         className={cn(
-                          "border-b border-border/20 last:border-0 hover:bg-muted/10 transition-colors group",
+                          "border-b last:border-0 hover:bg-muted/10 transition-colors group",
+                          (days !== null && days <= 0) 
+                            ? "border border-yellow-500 animate-pulse bg-yellow-500/5 shadow-[inset_0_0_15px_rgba(234,179,8,0.2)]" 
+                            : "border-border/20",
                           !isDeveloper ? "cursor-pointer" : "cursor-default"
                         )}
                         onClick={() => {

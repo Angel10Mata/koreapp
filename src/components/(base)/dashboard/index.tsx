@@ -51,7 +51,7 @@ const MODULES: Module[] = [
     title: "Módulo de",
     subtitle: "Finanzas",
     desc: "Administración de gastos, métricas y control de flujo de caja.",
-    icon: "pimvysaa",
+    icon: "rhmhivzj",
     href: "/kore/finanzas",
     allowedRoles: ["super", "admin", "finanzas"],
     colSpan: "md:col-span-1",
@@ -133,7 +133,7 @@ export function Dashboard() {
             >
                 <div
                   onClick={() => handleCardClick(mod.id, mod.href)}
-                  className="group flex flex-col border border-red-500 dark:border-red-500/50 overflow-hidden h-full w-full rounded-2xl transition-colors duration-500 cursor-pointer bg-white dark:bg-black backdrop-blur-md hover:border-red-600 dark:hover:border-red-500 hover:shadow-lg hover:shadow-red-600/10 dark:hover:shadow-red-500/10"
+                  className="group flex flex-col border border-red-500 dark:border-red-500/50 overflow-hidden h-full w-full rounded-2xl transition-colors duration-500 cursor-pointer bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-xl hover:border-red-600 dark:hover:border-red-500 hover:shadow-lg hover:shadow-red-600/10 dark:hover:shadow-red-500/10"
                   style={{
                     borderColor: isActive ? "#ef4444" : undefined,
                   }}
@@ -190,7 +190,7 @@ export function Dashboard() {
                             className="w-full h-full flex items-center justify-center relative"
                           >
                             <div 
-                              className="absolute inset-[-6px] bg-white rounded-2xl border border-slate-200/80 shadow-md transition-all duration-500 -z-10 opacity-100 scale-100"
+                              className="absolute inset-[-6px] bg-white rounded-2xl transition-all duration-500 -z-10 opacity-100 scale-100"
                             />
                             <AnimatedIcon
                               iconKey={mod.icon}

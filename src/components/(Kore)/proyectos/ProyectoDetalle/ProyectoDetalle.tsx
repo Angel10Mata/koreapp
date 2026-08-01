@@ -55,27 +55,29 @@ function DetailDeduccionItem({ d, forceOpen, precio }: { d: DetalleDed; forceOpe
           {d.tipo}
         </span>
         <div className="flex-1" />
-        <div className="flex flex-col items-end shrink-0 text-right">
-          <span className="text-sm font-black tabular-nums text-foreground">
-            Q{valorMonetario.toLocaleString('en-US', {minimumFractionDigits: 2})}
-          </span>
-          <span className="text-[10px] font-bold text-muted-foreground tabular-nums leading-none mt-0.5">
-            {Number(d.porcentaje)}%
-          </span>
+        <div className="flex items-center justify-end shrink-0 w-[120px]">
+          <div className="flex flex-col items-end shrink-0 text-right">
+            <span className="text-sm font-black tabular-nums text-foreground">
+              Q{valorMonetario.toLocaleString('en-US', {minimumFractionDigits: 2})}
+            </span>
+            <span className="text-[10px] font-bold text-muted-foreground tabular-nums leading-none mt-0.5">
+              {Number(d.porcentaje)}%
+            </span>
+          </div>
+          {hasDetails ? (
+            <ChevronDown
+              size={12}
+              className={`text-muted-foreground/40 transition-transform duration-200 shrink-0 ml-3 ${
+                isOpen ? "rotate-180" : ""
+              }`}
+            />
+          ) : (
+            <ChevronDown
+              size={12}
+              className="text-transparent shrink-0 pointer-events-none select-none ml-3"
+            />
+          )}
         </div>
-        {hasDetails ? (
-          <ChevronDown
-            size={12}
-            className={`text-muted-foreground/40 transition-transform duration-200 shrink-0 ${
-              isOpen ? "rotate-180" : ""
-            }`}
-          />
-        ) : (
-          <ChevronDown
-            size={12}
-            className="text-transparent shrink-0 pointer-events-none select-none"
-          />
-        )}
       </div>
 
       <AnimatePresence initial={false}>
@@ -153,7 +155,7 @@ function DetailDedListWithToggle({
         )}
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs font-black px-2 py-1 rounded-lg border text-destructive border-destructive/20 bg-destructive/10">
-            Total: Q{totalDeduccionesMonetario.toLocaleString("en-US", { minimumFractionDigits: 2 })} ({totalPct}%)
+            Total de proyecto: Q{totalDeduccionesMonetario.toLocaleString("en-US", { minimumFractionDigits: 2 })}
           </span>
           {sortedDeds.length > 0 && (
             <div className="p-1 rounded-md bg-muted/40 dark:bg-white/10 flex items-center justify-center ml-1">
@@ -189,14 +191,16 @@ function DetailDedListWithToggle({
         )}
       </AnimatePresence>
 
-      <div className="space-y-2 pt-2 text-xs sm:text-sm border-t border-zinc-100 dark:border-zinc-800/60">
+      <div className="space-y-2 pt-2 text-xs sm:text-sm border-t border-zinc-100 dark:border-zinc-800/60 px-4">
         <div className="flex justify-between items-center gap-2 py-0.5">
           <span className="text-zinc-500 dark:text-zinc-400 min-w-0 truncate">
             Total Deducibles ({totalPct}%):
           </span>
-          <span className="font-bold shrink-0 text-right text-destructive">
-            Q{totalDeduccionesMonetario.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-          </span>
+          <div className="flex justify-end w-[120px]">
+            <span className="font-bold shrink-0 text-right text-destructive pr-[26px]">
+              Q{totalDeduccionesMonetario.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </span>
+          </div>
         </div>
 
         {mant > 0 && (
@@ -204,17 +208,21 @@ function DetailDedListWithToggle({
             <span className="text-zinc-500 dark:text-zinc-400 min-w-0 truncate">
               Mantenimiento Mensual:
             </span>
-            <span className="font-bold shrink-0 text-right text-celeste-kore">
-              Q{mant.toLocaleString("en-US", { minimumFractionDigits: 2 })} / mes
-            </span>
+            <div className="flex justify-end w-[120px]">
+              <span className="font-bold shrink-0 text-right text-celeste-kore pr-[26px]">
+                Q{mant.toLocaleString("en-US", { minimumFractionDigits: 2 })} / mes
+              </span>
+            </div>
           </div>
         )}
 
         <div className="flex justify-between items-center gap-2 py-1.5 border-t border-zinc-200 dark:border-zinc-800/80 pt-2 font-black text-sm sm:text-base text-celeste-kore">
           <span className="min-w-0 truncate">Saldo Final:</span>
-          <span className="shrink-0 text-right">
-            Q{restante.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-          </span>
+          <div className="flex justify-end w-[120px]">
+            <span className="shrink-0 text-right pr-[26px]">
+              Q{restante.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -409,7 +417,7 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
   ].filter(d => d.value > 0);
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-6 px-4 pt-32 pb-16 md:px-8 md:pt-20">
+    <div className="w-full max-w-5xl mx-auto space-y-6 px-2 pt-32 pb-8 md:px-4 md:pt-28">
       {/* Dynamic Browser Tab Title */}
       <title>{`Detalle de Proyecto: ${proyecto.nombre} | KORE BMS`}</title>
 
