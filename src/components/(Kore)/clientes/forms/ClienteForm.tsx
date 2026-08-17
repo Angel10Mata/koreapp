@@ -4,21 +4,17 @@ import { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   Users,
-  Phone,
   Mail,
   Save,
-  X,
   ChevronDown,
-  MapPin,
   Loader2
 } from "lucide-react";
-import Swal from "sweetalert2";
-import { DEPARTAMENTOS_GUATEMALA } from "@/utils/guatemala";
 import {
-  getClientes,
-  createCliente,
-  updateCliente
-} from "@/components/(Kore)/clientes/lib/actions";
+  useClientes,
+  useCreateCliente,
+  useUpdateCliente
+} from "@/components/(Kore)/clientes/lib/hooks";
+import { DEPARTAMENTOS_GUATEMALA } from "@/utils/guatemala";
 
 const COUNTRIES = [
   { code: "+502", flag: "🇬🇹", name: "Guatemala" },
@@ -57,8 +53,10 @@ function ClienteFormContent() {
   const isEditRoute = pathname?.includes("/editar");
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  
+  const { data: allClientes, isLoading: loadingClientes } = useClientes();
+  const createMutation = useCreateCliente();
+  const updateMutation = useUpdateCliente();
 
   // Form State
   const [formData, setFormData] = useState({
@@ -86,6 +84,7 @@ function ClienteFormContent() {
     if (!isEditRoute) return;
     const id = paramId || sessionStorage.getItem("selectedClienteId");
     if (id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditingId(id);
       // Clean up URL parameters if they accessed the page via query string
       if (paramId) {
@@ -99,41 +98,24 @@ function ClienteFormContent() {
 
   // Load client details if editing
   useEffect(() => {
-    if (!editingId) return;
-    setLoading(true);
-    getClientes()
-      .then((data) => {
-        const found = data.find((c) => c.id === editingId);
-        if (found) {
-          const { countryCode, localNumber } = parsePhoneNumber(found.telefono || "");
-          setSelectedCountry(countryCode);
-          setFormData({
-            nombre: found.nombre,
-            nit: found.nit || "",
-            telefono: localNumber,
-            correo: found.correo || "",
-            departamento: found.departamento || "",
-            municipio: found.municipio || "",
-          });
-        } else {
-          Swal.fire({
-            icon: "error",
-            title: "Error",
-            text: "Cliente no encontrado.",
-            background: "#18181b",
-            color: "#fff",
-            confirmButtonColor: "#B7494E",
-          });
-          router.replace("/kore/clientes");
-        }
-      })
-      .catch((err) => {
-        console.error("Error loading client:", err);
-      })
-      .finally(() => {
-        setLoading(false);
+    if (!editingId || !allClientes) return;
+    const found = allClientes.find((c) => c.id === editingId);
+    if (found) {
+      const { countryCode, localNumber } = parsePhoneNumber(found.telefono || "");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedCountry(countryCode);
+      setFormData({
+        nombre: found.nombre,
+        nit: found.nit || "",
+        telefono: localNumber,
+        correo: found.correo || "",
+        departamento: found.departamento || "",
+        municipio: found.municipio || "",
       });
-  }, [editingId, router]);
+    } else {
+      router.replace("/kore/clientes");
+    }
+  }, [editingId, allClientes, router]);
 
   const municipiosDisponibles = useMemo(() => {
     if (!formData.departamento) return [];
@@ -207,42 +189,28 @@ function ClienteFormContent() {
     e.preventDefault();
     if (!validateForm()) return;
 
-    setSubmitting(true);
     const payload = {
       ...formData,
       telefono: selectedCountry + formData.telefono.trim(),
     };
 
-    let res: { success?: boolean; error?: string; cliente?: unknown };
     if (editingId) {
-      res = await updateCliente(editingId, payload);
-    } else {
-      res = await createCliente(payload);
-    }
-    setSubmitting(false);
-
-    if (res.error) {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: res.error,
-        background: "#18181b",
-        color: "#fff",
-        confirmButtonColor: "#B7494E",
+      updateMutation.mutate({ id: editingId, data: payload }, {
+        onSuccess: (res) => {
+          if (!res.error) {
+            sessionStorage.removeItem("selectedClienteId");
+            router.push("/kore/clientes");
+          }
+        }
       });
     } else {
-      Swal.fire({
-        icon: "success",
-        title: editingId ? "Cliente Actualizado" : "Cliente Registrado",
-        toast: true,
-        position: "top-end",
-        showConfirmButton: false,
-        timer: 3000,
-        background: "#18181b",
-        color: "#fff",
+      createMutation.mutate(payload, {
+        onSuccess: (res) => {
+          if (!res.error) {
+            router.push("/kore/clientes");
+          }
+        }
       });
-      sessionStorage.removeItem("selectedClienteId");
-      router.push("/kore/clientes");
     }
   };
 
@@ -251,7 +219,9 @@ function ClienteFormContent() {
     router.push("/kore/clientes");
   };
 
-  if (loading) {
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
+  if (editingId && loadingClientes) {
     return (
       <div className="w-full min-h-screen flex justify-center items-center bg-background text-foreground">
         <Loader2 className="animate-spin text-celeste-kore size-10" />
@@ -260,7 +230,7 @@ function ClienteFormContent() {
   }
 
   return (
-    <div className="w-full max-w-5xl mx-auto flex flex-col gap-6 text-foreground px-4 pt-32 pb-16 md:px-8 md:pt-24 relative">
+    <div className="w-full max-w-5xl mx-auto flex flex-col gap-6 text-foreground px-2 pt-32 pb-8 md:px-4 md:pt-28 relative">
       {/* Background Decorative Glows */}
       <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] bg-celeste-kore/10 rounded-full blur-[120px] pointer-events-none -z-10 animate-pulse" />
       
@@ -549,14 +519,10 @@ function ClienteFormContent() {
             </button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={isSubmitting}
               className="px-8 py-3 rounded-xl bg-celeste-kore text-black hover:bg-celeste-kore/90 font-black text-xs uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
             >
-              {submitting ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Save size={14} />
-              )}
+              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               {editingId ? "Actualizar" : "Registrar"}
             </button>
           </div>

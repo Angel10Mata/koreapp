@@ -187,23 +187,23 @@ export function VerUsuarios() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto border border-border rounded-xl bg-card mx-4">
-          <table className="w-full text-sm text-left border-separate border-spacing-0">
-            <thead className="sticky top-0 bg-muted/80 backdrop-blur-md z-20">
+        <div className="flex-1 overflow-auto border border-border/50 rounded-2xl bg-card mx-4">
+          <table className="w-full text-left border-collapse">
+            <thead className="sticky top-0 bg-celeste-kore/10 dark:bg-celeste-kore/20 backdrop-blur-md z-20 border-b border-border/50">
               <tr>
-                <th className="px-6 py-3 border-b border-border">
+                <th className="px-4 py-4 text-[10px] text-celeste-kore dark:text-white uppercase tracking-[0.15em] font-black">
                   <select
                     value={sortOrder}
                     onChange={(e) =>
                       setSortOrder(e.target.value as "asc" | "desc")
                     }
-                    className="bg-transparent font-semibold text-foreground focus:outline-none cursor-pointer hover:text-primary transition-colors uppercase text-xs w-full sm:w-auto"
+                    className="bg-transparent font-black text-celeste-kore dark:text-white focus:outline-none cursor-pointer hover:opacity-80 transition-opacity uppercase text-[10px] w-full sm:w-auto"
                   >
                     <option value="asc">Ordenar (A-Z)</option>
                     <option value="desc">Ordenar (Z-A)</option>
                   </select>
                 </th>
-                <th className="px-6 py-3 border-b border-border text-right">
+                <th className="px-4 py-4 text-[10px] text-celeste-kore dark:text-white uppercase tracking-[0.15em] font-black text-right">
                   <div className="flex items-center justify-end gap-1">
                     <select
                       value={roleFilter}
@@ -211,7 +211,7 @@ export function VerUsuarios() {
                         setRoleFilter(e.target.value);
                         setCurrentPage(1);
                       }}
-                      className="bg-transparent text-foreground focus:outline-none cursor-pointer hover:text-primary transition-colors text-xs font-medium text-right"
+                      className="bg-transparent font-black text-celeste-kore dark:text-white focus:outline-none cursor-pointer hover:opacity-80 transition-opacity text-[10px] uppercase text-right"
                     >
                       <option value="all">Rol: Todos</option>
                       {availableRoles.map((role) => (
@@ -243,7 +243,7 @@ export function VerUsuarios() {
                       <tr>
                         <td
                           colSpan={2}
-                          className="bg-muted/30 px-6 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-y border-border/50"
+                          className="bg-muted/30 px-4 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-y border-border/50"
                         >
                           {firstLetter}
                         </td>
@@ -251,12 +251,12 @@ export function VerUsuarios() {
                     )}
                     <tr
                       onClick={() => handleUserClick(userItem.id)}
-                      className="group hover:bg-muted/40 transition-colors cursor-pointer"
+                      className="group border-b border-border/50 last:border-0 even:bg-muted/10 odd:bg-transparent hover:bg-muted/30 transition-colors cursor-pointer"
                     >
-                      <td className="px-6 py-3 font-medium group-hover:text-primary transition-colors border-b border-border/40">
+                      <td className="px-4 py-4 text-sm font-medium group-hover:text-primary transition-colors">
                         {userItem.nombre || "Sin Nombre"}
                       </td>
-                      <td className="px-6 py-3 border-b border-border/40 text-right">
+                      <td className="px-4 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <span className="capitalize text-[10px] font-bold bg-primary/5 px-2 py-0.5 rounded border border-primary/10">
                             {userItem.rol ? roleLabels[userItem.rol] || userItem.rol : "Sin Rol"}

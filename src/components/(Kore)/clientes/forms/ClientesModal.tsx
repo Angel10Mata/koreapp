@@ -9,16 +9,33 @@ import {
   Mail,
   ChevronDown,
   ChevronUp,
-  FileText,
-  DollarSign,
-  Briefcase,
   Users
 } from "lucide-react";
+
+import { Proyecto } from "@/components/(Kore)/proyectos/lib/zod";
+
+interface ClientProjectItem {
+  id: string;
+  nombre: string;
+  estado: string;
+  precio: number;
+  fecha?: string | null;
+}
+
+interface ClientGroup {
+  nombre: string;
+  nit: string;
+  telefono: string;
+  correo: string;
+  totalPagado: number;
+  proyectosCount: number;
+  proyectosList: ClientProjectItem[];
+}
 
 interface ClientesModalProps {
   isOpen: boolean;
   onClose: () => void;
-  proyectos: any[];
+  proyectos: Proyecto[];
 }
 
 // Helper to generate short code from UUID
@@ -74,7 +91,7 @@ export default function ClientesModal({
 
   // Group projects by client name
   const clientsData = useMemo(() => {
-    const clientsMap: { [nombre: string]: any } = {};
+    const clientsMap: { [nombre: string]: ClientGroup } = {};
 
     proyectos.forEach((p) => {
       const name = (p.cliente_nombre || "Sin Cliente").trim();
@@ -116,11 +133,11 @@ export default function ClientesModal({
     });
 
     // Sort projects inside each client by date or price
-    Object.values(clientsMap).forEach((client: any) => {
-      client.proyectosList.sort((a: any, b: any) => b.precio - a.precio);
+    Object.values(clientsMap).forEach((client: ClientGroup) => {
+      client.proyectosList.sort((a: ClientProjectItem, b: ClientProjectItem) => b.precio - a.precio);
     });
 
-    return Object.values(clientsMap).sort((a: any, b: any) => b.totalPagado - a.totalPagado);
+    return Object.values(clientsMap).sort((a: ClientGroup, b: ClientGroup) => b.totalPagado - a.totalPagado);
   }, [proyectos]);
 
   // Filter clients based on search term
@@ -129,7 +146,7 @@ export default function ClientesModal({
     if (!term) return clientsData;
 
     return clientsData.filter(
-      (c: any) =>
+      (c: ClientGroup) =>
         c.nombre.toLowerCase().includes(term) ||
         c.telefono.toLowerCase().includes(term) ||
         c.correo.toLowerCase().includes(term)
@@ -224,7 +241,7 @@ export default function ClientesModal({
                   </p>
                 </div>
               ) : (
-                filteredClients.map((client: any) => {
+                filteredClients.map((client: ClientGroup) => {
                   const isExpanded = expandedClient === client.nombre;
 
                   return (
@@ -304,31 +321,31 @@ export default function ClientesModal({
                                 Desglose de Proyectos
                               </h4>
                               
-                              <div className="overflow-x-auto">
+                              <div className="overflow-x-auto rounded-xl border border-border/50">
                                 <table className="w-full text-left text-xs border-collapse">
-                                  <thead>
-                                    <tr className="text-[9px] text-muted-foreground uppercase border-b border-white/10 pb-1">
-                                      <th className="pb-2 font-black">Código</th>
-                                      <th className="pb-2 font-black">Nombre Proyecto</th>
-                                      <th className="pb-2 font-black">Estado</th>
-                                      <th className="pb-2 font-black text-right">Monto</th>
+                                  <thead className="bg-celeste-kore/10 dark:bg-celeste-kore/20 border-b border-white/10">
+                                    <tr className="text-[9px] text-celeste-kore dark:text-white uppercase pb-1 tracking-widest">
+                                      <th className="px-4 py-3 font-black">Código</th>
+                                      <th className="px-4 py-3 font-black">Nombre Proyecto</th>
+                                      <th className="px-4 py-3 font-black">Estado</th>
+                                      <th className="px-4 py-3 font-black text-right">Monto</th>
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {client.proyectosList.map((proj: any) => (
+                                    {client.proyectosList.map((proj: ClientProjectItem) => (
                                       <tr
                                         key={proj.id}
-                                        className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors"
+                                        className="border-b border-white/5 last:border-0 hover:bg-white/5 even:bg-white/[0.02] odd:bg-transparent transition-colors"
                                       >
-                                        <td className="py-2.5 font-mono text-[10px] text-white">
+                                        <td className="px-4 py-3 font-mono text-[10px] text-white">
                                           <span className="font-bold text-celeste-kore bg-celeste-kore/10 px-1.5 py-0.5 rounded border border-celeste-kore/20">
                                             {getCode(proj.id)}
                                           </span>
                                         </td>
-                                        <td className="py-2.5 font-semibold text-white">
+                                        <td className="px-4 py-3 font-semibold text-white">
                                           {proj.nombre}
                                         </td>
-                                        <td className="py-2.5">
+                                        <td className="px-4 py-3">
                                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black uppercase border tracking-wider ${
                                             proj.estado === 'En Progreso' ? 'bg-celeste-kore/10 text-celeste-kore border-celeste-kore/20' :
                                             proj.estado === 'Finalizados' ? 'bg-muted text-muted-foreground border-border' :
@@ -337,16 +354,16 @@ export default function ClientesModal({
                                             {proj.estado}
                                           </span>
                                         </td>
-                                        <td className="py-2.5 text-right font-black text-white">
+                                        <td className="px-4 py-3 text-right font-black text-white">
                                           Q{proj.precio.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                                         </td>
                                       </tr>
                                     ))}
                                     <tr className="border-t border-white/10 font-bold bg-white/5">
-                                      <td colSpan={3} className="py-3 text-right pr-4 text-[9px] font-black uppercase text-muted-foreground tracking-widest">
+                                      <td colSpan={3} className="px-4 py-4 text-right pr-4 text-[9px] font-black uppercase text-muted-foreground tracking-widest">
                                         Total Inversión:
                                       </td>
-                                      <td className="py-3 text-right font-black text-celeste-kore text-sm">
+                                      <td className="px-4 py-4 text-right font-black text-celeste-kore text-sm">
                                         Q{client.totalPagado.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                                       </td>
                                     </tr>

@@ -8,23 +8,14 @@ import {
   CircleDollarSign,
   CalendarDays,
   Filter,
-  Plus,
   Search,
   Download,
-  Edit,
-  Trash2,
-  RefreshCw,
-  Clock,
   ChevronDown,
   Calendar,
   ChevronLeft,
   ChevronRight,
-  X,
-  ArrowLeft,
-  Home,
-  Wrench,
 } from "lucide-react";
-import Link from "next/link";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   BarChart,
   Bar,
@@ -36,18 +27,23 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { getProyectos, deleteProyecto } from "@/components/(Kore)/proyectos/lib/actions";
-import Swal from "sweetalert2";
+import { useProyectos } from "@/components/(Kore)/proyectos/lib/hooks";
+import { Proyecto } from "@/components/(Kore)/proyectos/lib/zod";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import QRProyecto from "../QRProyecto/QRProyecto";
-import { QrCode, Users } from "lucide-react";
-import { useTheme } from "next-themes";
-import { MagicCard } from "@/components/ui/magic-card";
 import { useUserContext } from "@/components/(base)/providers/UserProvider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 
 // TypeScript declaration for the Lordicon web component
+/* eslint-disable @typescript-eslint/no-namespace */
 declare global {
   namespace JSX {
     interface IntrinsicElements {
@@ -60,201 +56,7 @@ declare global {
     }
   }
 }
-
-// ── DashboardDeduccionItem ───────────────────────────────────────────────────────────────────
-
-const DASH_TIPO_STYLE: Record<string, string> = {
-  "IVA":           "bg-amber-500/10 text-amber-400 border-amber-500/25",
-  "Documentación": "bg-purple-500/10 text-purple-400 border-purple-500/25",
-  "Comisión":      "bg-blue-500/10 text-blue-400 border-blue-500/25",
-  "Vendedor":      "bg-blue-500/10 text-blue-400 border-blue-500/25",
-  "Kore":          "bg-red-500/10 text-red-400 border-red-500/25",
-  "Desarrollador": "bg-sky-500/10 text-sky-400 border-sky-500/25",
-};
-
-function DashboardDeduccionItem({ d, forceOpen, precio }: { d: any; forceOpen: boolean; precio: number }) {
-  const [open, setOpen] = useState(false);
-  const userName = d.usuario_nombre || "";
-  const hasDetails = !!(userName || d.descripcion);
-  const isOpen = forceOpen || open;
-  const pillClass = DASH_TIPO_STYLE[d.tipo] || "bg-zinc-500/10 text-zinc-400 border-zinc-500/25";
-  const valorMonetario = precio * (Number(d.porcentaje) || 0) / 100;
-
-  return (
-    <div
-      className={`border-b border-zinc-200 dark:border-zinc-800 last:border-0 ${
-        hasDetails ? "cursor-pointer" : ""
-      }`}
-      onClick={() => hasDetails && setOpen((o) => !o)}
-    >
-      {/* Fila principal */}
-      <div className="flex items-center gap-2 px-4 py-2.5">
-        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border shrink-0 ${pillClass}`}>
-          {d.tipo}
-        </span>
-        <div className="flex-1" />
-        <div className="flex flex-col items-end shrink-0 text-right">
-          <span className="text-sm font-black tabular-nums text-foreground">
-            Q{valorMonetario.toLocaleString('en-US', {minimumFractionDigits: 2})}
-          </span>
-          <span className="text-[10px] font-bold text-muted-foreground tabular-nums leading-none mt-0.5">
-            {Number(d.porcentaje)}%
-          </span>
-        </div>
-        {hasDetails ? (
-          <ChevronDown
-            size={12}
-            className={`text-muted-foreground/40 transition-transform duration-200 shrink-0 ${
-              isOpen ? "rotate-180" : ""
-            }`}
-          />
-        ) : (
-          <ChevronDown
-            size={12}
-            className="text-transparent shrink-0 pointer-events-none select-none"
-          />
-        )}
-      </div>
-
-      {/* Detalles colapsables */}
-      <AnimatePresence initial={false}>
-        {isOpen && hasDetails && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.16 }}
-            className="overflow-hidden"
-          >
-            <div className="px-4 pb-2.5 space-y-0.5 border-t border-zinc-100 dark:border-zinc-800/60">
-              {userName && (
-                <p className="text-[11px] text-foreground/60 pt-1.5">
-                  <span className="font-semibold text-foreground/50">Asignado a:</span>{" "}
-                  <span className="font-bold text-sky-500">{userName}</span>
-                </p>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function DedListWithToggle({
-  deds,
-  totalPct,
-  precio,
-  mant,
-  restante,
-}: {
-  deds: any[];
-  totalPct: number;
-  precio: number;
-  mant: number;
-  restante: number;
-}) {
-  const [allExpanded, setAllExpanded] = useState(false);
-  const totalDeduccionesMonetario = (precio * totalPct) / 100;
-
-  // Sort by specific order: Kore, IVA, Documentación, Desarrollador, Vendedor, others
-  const sortedDeds = [...deds].sort((a, b) => {
-    const getOrderScore = (tipo: string) => {
-      const t = tipo.toLowerCase();
-      if (t === "kore") return 1;
-      if (t === "iva") return 2;
-      if (t === "documentación" || t === "documentacion") return 3;
-      if (t === "desarrollador" || t === "desarrolladores" || t === "desarrollo") return 4;
-      if (t === "vendedor" || t === "vendedores" || t === "comisión" || t === "comision") return 5;
-      return 6;
-    };
-    return getOrderScore(a.tipo) - getOrderScore(b.tipo);
-  });
-
-  return (
-    <div className="space-y-3 pt-3.5 border-t border-zinc-200 dark:border-zinc-800/80">
-      {/* Header — Clickable to expand/collapse all */}
-      <button
-        type="button"
-        onClick={() => setAllExpanded((v) => !v)}
-        className="w-full flex items-center gap-3 pb-2 text-left hover:opacity-80 transition-opacity"
-      >
-        <h5 className="text-[11px] font-black uppercase tracking-widest text-foreground/70">
-          Deducibles:
-        </h5>
-        {sortedDeds.length > 0 && (
-          <span className="text-[11px] font-black text-foreground/70">
-            {sortedDeds.length}
-          </span>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-xs font-black px-2 py-1 rounded-lg border text-destructive border-destructive/20 bg-destructive/10">
-            Total: Q{totalDeduccionesMonetario.toLocaleString("en-US", { minimumFractionDigits: 2 })} ({totalPct}%)
-          </span>
-          {sortedDeds.length > 0 && (
-            <ChevronDown
-              size={13}
-              className={`text-muted-foreground/50 transition-transform duration-200 ${
-                allExpanded ? "rotate-180" : ""
-              }`}
-            />
-          )}
-        </div>
-      </button>
-
-      {/* Accordion List */}
-      <AnimatePresence mode="popLayout">
-        {sortedDeds.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="space-y-1.5"
-          >
-            {sortedDeds.map((d, index) => (
-              <DashboardDeduccionItem
-                key={index}
-                d={d}
-                forceOpen={allExpanded}
-                precio={precio}
-              />
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Extra Financial Details: Mantenimiento (only if > 0) & Saldo Final */}
-      <div className="space-y-2 pt-2 text-xs sm:text-sm border-t border-zinc-100 dark:border-zinc-800/60">
-        <div className="flex justify-between items-center gap-2 py-0.5">
-          <span className="text-zinc-500 dark:text-zinc-400 min-w-0 truncate">
-            Total Deducibles ({totalPct}%):
-          </span>
-          <span className="font-bold shrink-0 text-right text-destructive">
-            Q{totalDeduccionesMonetario.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-          </span>
-        </div>
-
-        {mant > 0 && (
-          <div className="flex justify-between items-center gap-2 py-0.5">
-            <span className="text-zinc-500 dark:text-zinc-400 min-w-0 truncate">
-              Mantenimiento Mensual:
-            </span>
-            <span className="font-bold shrink-0 text-right text-celeste-kore">
-              Q{mant.toLocaleString("en-US", { minimumFractionDigits: 2 })} / mes
-            </span>
-          </div>
-        )}
-
-        <div className="flex justify-between items-center gap-2 py-1.5 border-t border-zinc-200 dark:border-zinc-800/80 pt-2 font-black text-sm sm:text-base text-celeste-kore">
-          <span className="min-w-0 truncate">Saldo Final:</span>
-          <span className="shrink-0 text-right">
-            Q{restante.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
+/* eslint-enable @typescript-eslint/no-namespace */
 
 const monthsFull = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -269,18 +71,18 @@ const monthsAbbr = [
 const getWeeksOfMonth = (year: number, month: number) => {
   const weeks = [];
   const monthNames = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-  
+
   for (let i = 0; i < 5; i++) {
     const startDay = 1 + i * 7;
-    
+
     // Construct start date
     const startDate = new Date(year, month, startDay);
     // Construct end date (start date + 6 days)
     const endDate = new Date(year, month, startDay + 6);
-    
+
     const startLabel = `${startDate.getDate()} ${monthNames[startDate.getMonth()]}`;
     const endLabel = `${endDate.getDate()} ${monthNames[endDate.getMonth()]}`;
-    
+
     weeks.push({
       label: `${startLabel} - ${endLabel}`,
       start: startDate,
@@ -299,7 +101,6 @@ const formatDateSlash = (dateStr: string) => {
 
 export default function DashboardProyectos() {
   const router = useRouter();
-  const { theme } = useTheme();
   const { effectiveRole } = useUserContext();
   const isAdmin = ["super", "admin"].includes(effectiveRole);
 
@@ -319,7 +120,7 @@ export default function DashboardProyectos() {
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [tempYear, setTempYear] = useState<number>(new Date().getFullYear());
   const [selectedWeekIndex, setSelectedWeekIndex] = useState<number | null>(null);
-  
+
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [showWeekPicker, setShowWeekPicker] = useState(false);
   const [showRangePicker, setShowRangePicker] = useState(false);
@@ -331,19 +132,19 @@ export default function DashboardProyectos() {
     const startOfMonth = new Date(year, month, 1);
     const endOfMonth = new Date(year, month + 1, 0);
     const daysInMonth = endOfMonth.getDate();
-    
+
     const startDayOfWeek = startOfMonth.getDay();
     const grid = [];
-    
+
     for (let i = 0; i < startDayOfWeek; i++) {
       grid.push(null);
     }
-    
+
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       grid.push({ dayNum: d, dateStr });
     }
-    
+
     return grid;
   }, []);
   const handleDayClick = (dayStr: string) => {
@@ -363,32 +164,11 @@ export default function DashboardProyectos() {
     setShowRangePicker(false);
   };
 
-  const shiftDateRange = (direction: "prev" | "next") => {
-    const start = new Date(dateRange.start + "T00:00:00");
-    const end = new Date(dateRange.end + "T23:59:59");
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
-    
-    const shift = direction === "prev" ? -diffDays : diffDays;
-    
-    const newStart = new Date(start);
-    newStart.setDate(start.getDate() + shift);
-    
-    const newEnd = new Date(end);
-    newEnd.setDate(end.getDate() + shift);
-    
-    setDateRange({
-      start: newStart.toISOString().split("T")[0],
-      end: newEnd.toISOString().split("T")[0]
-    });
-  };
-
-  const [proyectos, setProyectos] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: proyectos = [], isLoading: loading, refetch } = useProyectos();
   const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "alphabetical">("newest");
   const [showList, setShowList] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [qrProyecto, setQrProyecto] = useState<any | null>(null);
+  const [qrProyecto, setQrProyecto] = useState<Proyecto | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
@@ -396,29 +176,15 @@ export default function DashboardProyectos() {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const data = await getProyectos();
-      setProyectos(data || []);
-      
-      // Si el modal de QR está abierto, actualizar sus datos con la información más reciente de la DB
-      if (qrProyecto) {
-        const updated = data?.find((p: any) => p.id === qrProyecto.id);
-        if (updated) {
-          setQrProyecto(updated);
-        }
-      }
-    } catch (err) {
-      console.error("Error fetching projects:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (qrProyecto && proyectos.length > 0) {
+      const updated = proyectos.find((p: Proyecto) => p.id === qrProyecto.id);
+      if (updated) {
+        setQrProyecto(updated);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proyectos, qrProyecto?.id]);
 
   // Load Lordicon script
   useEffect(() => {
@@ -574,50 +340,6 @@ export default function DashboardProyectos() {
     doc.save(`kore-proyectos-${now.toISOString().split("T")[0]}.pdf`);
   };
 
-  const handleDelete = async (id: string): Promise<boolean> => {
-    const isDark = typeof window !== "undefined" && document.documentElement.classList.contains("dark");
-    const result = await Swal.fire({
-      title: 'Eliminar Proyecto',
-      text: "Esta acción no se puede deshacer.",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: isDark ? '#27272a' : '#71717a',
-      confirmButtonText: 'Eliminar Proyecto',
-      cancelButtonText: 'Cancelar',
-      background: isDark ? '#18181b' : '#ffffff',
-      color: isDark ? '#ffffff' : '#000000',
-    });
-
-    if (result.isConfirmed) {
-      const res = await deleteProyecto(id);
-      if (res.error) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: res.error,
-          background: isDark ? '#18181b' : '#ffffff',
-          color: isDark ? '#ffffff' : '#000000',
-        });
-        return false;
-      } else {
-        Swal.fire({
-          icon: 'success',
-          title: 'Eliminado',
-          toast: true,
-          position: 'top-end',
-          showConfirmButton: false,
-          timer: 3000,
-          background: isDark ? '#18181b' : '#ffffff',
-          color: isDark ? '#ffffff' : '#000000',
-        });
-        fetchData();
-        return true;
-      }
-    }
-    return false;
-  };
-
   // --- DERIVED DATA ---
   const summary = useMemo(() => {
     let totalPrecio = 0;
@@ -637,10 +359,10 @@ export default function DashboardProyectos() {
   }, [proyectos]);
 
   const pieData = useMemo(() => {
-    const counts = { 
-      "En Progreso": { count: 0, mant: 0 }, 
-      "En pausa": { count: 0, mant: 0 }, 
-      "Finalizados": { count: 0, mant: 0 } 
+    const counts = {
+      "En Progreso": { count: 0, mant: 0 },
+      "En pausa": { count: 0, mant: 0 },
+      "Finalizados": { count: 0, mant: 0 }
     };
     proyectos.forEach(p => {
       const mant = Number(p.mantenimiento) || 0;
@@ -648,7 +370,7 @@ export default function DashboardProyectos() {
       else if (p.estado === "En pausa") { counts["En pausa"].count++; counts["En pausa"].mant += mant; }
       else { counts["Finalizados"].count++; counts["Finalizados"].mant += mant; }
     });
- 
+
     return [
       { name: "Activos", value: counts["En Progreso"].count || 0, mant: counts["En Progreso"].mant, color: "#B7494E" },
       { name: "En pausa", value: counts["En pausa"].count || 0, mant: counts["En pausa"].mant, color: "#3D3C3C" },
@@ -662,11 +384,11 @@ export default function DashboardProyectos() {
     if (chartTab === "RANGO") {
       const start = new Date(dateRange.start + "T00:00:00");
       const end = new Date(dateRange.end + "T23:59:59");
-      const data: any[] = [];
-      
+      const data: { name: string; dateStr?: string; precio: number; comision: number; iva: number; sortKey?: number }[] = [];
+
       // Creamos un mapa para agrupar
       const diffDays = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-      
+
       if (diffDays <= 45) {
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
           data.push({ name: d.getDate().toString(), dateStr: d.toISOString().split('T')[0], precio: 0, comision: 0, iva: 0 });
@@ -702,7 +424,7 @@ export default function DashboardProyectos() {
             if (p.aplica_iva) item.iva += precio * (Number(p.porcentaje_iva) || 0) / 100;
           }
         });
-        data.sort((a, b) => a.sortKey - b.sortKey);
+        data.sort((a, b) => (a.sortKey ?? 0) - (b.sortKey ?? 0));
       }
       return data;
     }
@@ -717,7 +439,7 @@ export default function DashboardProyectos() {
         end.setHours(23, 59, 59, 999);
 
         // Generate 7 days for the selected week
-        const dataByDay: any[] = [];
+        const dataByDay: { name: string; dateStr: string; precio: number; comision: number; iva: number }[] = [];
         const tempDate = new Date(start);
         for (let i = 0; i < 7; i++) {
           dataByDay.push({
@@ -792,14 +514,25 @@ export default function DashboardProyectos() {
   }, [proyectos, chartTab, dateRange, selectedMonth, selectedYear, selectedWeekIndex]);
 
   const filteredProyectos = useMemo(() => {
-    if (!searchTerm) return proyectos;
-    const lower = searchTerm.toLowerCase();
-    return proyectos.filter(p => 
-      p.nombre?.toLowerCase().includes(lower) || 
-      p.cliente_nombre?.toLowerCase().includes(lower) ||
-      p.vendedor_nombre?.toLowerCase().includes(lower)
-    );
-  }, [proyectos, searchTerm]);
+    let result = [...proyectos];
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      result = result.filter(p =>
+        p.nombre?.toLowerCase().includes(lower) ||
+        p.cliente_nombre?.toLowerCase().includes(lower) ||
+        p.vendedor_nombre?.toLowerCase().includes(lower)
+      );
+    }
+
+    return [...result].sort((a, b) => {
+      if (sortBy === "alphabetical") {
+        return (a.nombre || "").localeCompare(b.nombre || "");
+      }
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+      return sortBy === "newest" ? dateB - dateA : dateA - dateB;
+    });
+  }, [proyectos, searchTerm, sortBy]);
 
   const totalPages = useMemo(() => {
     return Math.ceil(filteredProyectos.length / itemsPerPage) || 1;
@@ -817,7 +550,7 @@ export default function DashboardProyectos() {
   // Proyectos con fecha de entrega para la vista de usuarios normales
   const proyectosConFecha = useMemo(() => {
     return proyectos
-      .filter(p => p.fecha_entrega)
+      .filter((p): p is Proyecto & { fecha_entrega: string } => Boolean(p.fecha_entrega))
       .sort((a, b) => new Date(a.fecha_entrega).getTime() - new Date(b.fecha_entrega).getTime());
   }, [proyectos]);
 
@@ -836,22 +569,22 @@ export default function DashboardProyectos() {
     if (!phone) return "";
     const clean = phone.trim();
     if (!clean) return "";
-    
+
     // Clean spaces to match formats like +502 4214 0797 or +50242140797
     const cleanNoSpaces = clean.replace(/\s+/g, "");
-    
+
     // GT number with +502 and 8 digits -> XXXX-XXXX
     const gtMatch = cleanNoSpaces.match(/^\+502(\d{4})(\d{4})$/);
     if (gtMatch) {
       return `${gtMatch[1]}-${gtMatch[2]}`;
     }
-    
+
     // GT number with 8 digits (no prefix) -> XXXX-XXXX
     const gtShortMatch = cleanNoSpaces.match(/^(\d{4})(\d{4})$/);
     if (gtShortMatch) {
       return `${gtShortMatch[1]}-${gtShortMatch[2]}`;
     }
-    
+
     return clean;
   };
 
@@ -863,8 +596,16 @@ export default function DashboardProyectos() {
     return diff;
   };
 
+  const hasPendingMaintenance = useMemo(() => {
+    return proyectos?.some(p => {
+      if (!p.mantenimiento_activo || !p.mantenimiento_fecha_cobro) return false;
+      const days = getDaysUntil(p.mantenimiento_fecha_cobro.split("T")[0]);
+      return days <= 0;
+    }) || false;
+  }, [proyectos]);
+
   return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col gap-4 sm:gap-6 text-foreground px-4 pt-32 pb-16 md:px-8 md:pt-24 relative">
+    <div className="w-full max-w-5xl mx-auto flex flex-col gap-4 sm:gap-6 text-foreground px-2 pt-32 pb-8 md:px-4 md:pt-28 relative">
       {/* Decorative Background Glows */}
       <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] bg-celeste-kore/10 rounded-full blur-[120px] pointer-events-none -z-10 animate-pulse" />
       <div className="absolute bottom-[10%] right-[-5%] w-[30%] h-[30%] bg-azul-kore/5 rounded-full blur-[100px] pointer-events-none -z-10" />
@@ -879,13 +620,16 @@ export default function DashboardProyectos() {
         </div>
 
         <div className="flex items-stretch gap-2 w-full sm:w-auto">
-          <button 
+          <button
             onClick={() => router.push("/kore/proyectos/mantenimiento")}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-1 sm:gap-1.5 px-2 py-2.5 sm:px-6 sm:py-4 rounded-xl bg-celeste-kore text-black hover:bg-celeste-kore border border-transparent transition-all font-black text-[10px] sm:text-sm whitespace-nowrap cursor-pointer"
+            className="relative flex-1 sm:flex-none flex items-center justify-center gap-1 sm:gap-1.5 px-2 py-2.5 sm:px-6 sm:py-4 rounded-xl bg-celeste-kore text-black hover:bg-celeste-kore border border-transparent transition-all font-black text-[10px] sm:text-sm whitespace-nowrap cursor-pointer"
           >
             MANTENIMIENTO
+            {hasPendingMaintenance && (
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-yellow-400 rounded-full border-2 border-background shadow-[0_0_8px_rgba(250,204,21,0.8)] animate-pulse" />
+            )}
           </button>
-          <button 
+          <button
             onClick={() => router.push("/kore/proyectos/nuevo")}
             className="flex-1 sm:flex-none flex items-center justify-center gap-1 sm:gap-1.5 px-2 py-2.5 sm:px-6 sm:py-4 rounded-xl bg-celeste-kore text-black hover:bg-celeste-kore border border-transparent transition-all font-black text-[10px] sm:text-sm whitespace-nowrap cursor-pointer"
           >
@@ -901,7 +645,7 @@ export default function DashboardProyectos() {
           <div className="rounded-2xl border border-celeste-kore/55 dark:border-border bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-xl p-4 sm:p-6 shadow-none dark:shadow-2xl dark:shadow-black/20">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3 sm:gap-4">
               <div className="flex items-center gap-2 sm:gap-3">
-                <button 
+                <button
                   onClick={() => setShowList(!showList)}
                   className="p-1.5 sm:p-2 hover:bg-muted/50 rounded-lg transition-colors group"
                 >
@@ -914,22 +658,40 @@ export default function DashboardProyectos() {
                 </button>
                 <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest text-foreground/90">Lista de Proyectos</h3>
               </div>
-              <motion.div 
+              <motion.div
                 initial={false}
                 animate={{ opacity: showList ? 1 : 0, scale: showList ? 1 : 0.95, x: showList ? 0 : 20 }}
                 className={`flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto ${!showList ? 'pointer-events-none' : ''}`}
               >
                 <div className="relative flex-1 sm:w-[240px]">
                   <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input 
-                    type="text" 
-                    placeholder="BUSCAR PROYECTO..." 
+                  <input
+                    type="text"
+                    placeholder="BUSCAR PROYECTO..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full bg-muted/20 border border-border/60 rounded-lg py-2 pl-9 pr-3 text-[9px] font-black uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-celeste-kore/30 transition-all placeholder:text-muted-foreground/40 shadow-inner"
                   />
                 </div>
-                <button 
+                <div className="relative flex-1 sm:w-[240px]">
+                  <Select value={sortBy} onValueChange={(val: string) => setSortBy(val as "newest" | "oldest" | "alphabetical")}>
+                    <SelectTrigger className="w-full h-9 bg-card border border-border/50 text-[9px] font-black uppercase tracking-widest text-foreground/80 rounded-lg focus:outline-none focus:ring-2 focus:ring-celeste-kore/30 hover:bg-muted/50 transition-all shadow-sm outline-none px-3">
+                      <SelectValue placeholder="Ordenar por" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border/50 shadow-xl rounded-xl w-auto min-w-[160px]">
+                      <SelectItem value="newest" className="text-[10px] font-bold uppercase tracking-widest focus:bg-muted/50 focus:text-celeste-kore cursor-pointer py-2">
+                        Más reciente
+                      </SelectItem>
+                      <SelectItem value="oldest" className="text-[10px] font-bold uppercase tracking-widest focus:bg-muted/50 focus:text-celeste-kore cursor-pointer py-2">
+                        Menos reciente
+                      </SelectItem>
+                      <SelectItem value="alphabetical" className="text-[10px] font-bold uppercase tracking-widest focus:bg-muted/50 focus:text-celeste-kore cursor-pointer py-2">
+                        Orden alfabético
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <button
                   onClick={exportarPDF}
                   className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg border border-border/50 bg-card hover:bg-muted/50 hover:border-celeste-kore/30 transition-all text-xs font-bold shadow-sm group whitespace-nowrap"
                 >
@@ -939,17 +701,25 @@ export default function DashboardProyectos() {
               </motion.div>
             </div>
 
-            <motion.div 
+            <motion.div
               initial={false}
-              animate={{ 
+              animate={{
                 height: showList ? "auto" : 0,
                 opacity: showList ? 1 : 0
               }}
               className="w-full overflow-hidden"
             >
               {loading ? (
-                <div className="flex justify-center items-center py-10">
-                  <RefreshCw className="animate-spin text-celeste-kore" />
+                <div className="space-y-4 py-8">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4 p-4 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
+                      <Skeleton className="h-12 w-12 rounded-full" />
+                      <div className="space-y-2 flex-1">
+                        <Skeleton className="h-4 w-[250px]" />
+                        <Skeleton className="h-4 w-[200px]" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : filteredProyectos.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground border-t border-border/30">
@@ -958,23 +728,23 @@ export default function DashboardProyectos() {
               ) : (
                 <>
                   {/* DESKTOP TABLE - hidden on mobile */}
-                  <div className="hidden lg:block overflow-x-auto">
-                    <table className="w-full text-left border-separate border-spacing-y-2">
-                      <thead>
-                        <tr className="text-[10px] text-muted-foreground uppercase tracking-[0.15em]">
-                          <th className="pb-2 px-4 font-black">Código</th>
-                          <th className="pb-2 px-2 font-black">Proyecto</th>
-                          <th className="pb-2 px-2 font-black">Cliente</th>
-                          <th className="pb-2 px-2 font-black">Estado</th>
-                          <th className="pb-2 px-2 font-black text-right">Precio</th>
-                          <th className="pb-2 px-2 font-black text-right">Comisión</th>
-                          <th className="pb-2 px-2 font-black text-right">Desarrollo</th>
-                          <th className="pb-2 px-2 font-black text-right">IVA</th>
-                          <th className="pb-2 px-2 font-black text-right">Doc</th>
-                          <th className="pb-2 pl-2 pr-4 font-black text-right">Saldo Final</th>
+                  <div className="hidden lg:block overflow-x-auto rounded-2xl border border-border/50 bg-card">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-celeste-kore/10 dark:bg-celeste-kore/20 border-b border-border/50">
+                        <tr className="text-[10px] text-celeste-kore dark:text-white uppercase tracking-[0.15em]">
+                          <th className="py-4 px-4 font-black">Código</th>
+                          <th className="py-4 px-2 font-black">Proyecto</th>
+                          <th className="py-4 px-2 font-black">Cliente</th>
+                          <th className="py-4 px-2 font-black">Estado</th>
+                          <th className="py-4 px-2 font-black text-right">Precio</th>
+                          <th className="py-4 px-2 font-black text-right">Comisión</th>
+                          <th className="py-4 px-2 font-black text-right">Desarrollo</th>
+                          <th className="py-4 px-2 font-black text-right">IVA</th>
+                          <th className="py-4 px-2 font-black text-right">Doc</th>
+                          <th className="py-4 pl-2 pr-4 font-black text-right">Saldo Final</th>
                         </tr>
                       </thead>
-                      <tbody className="before:block before:h-2">
+                      <tbody>
                         {paginatedProyectos.map((p) => {
                           const precio = Number(p.precio) || 0;
                           const comision = p.aplica_vendedor ? precio * (Number(p.porcentaje_vendedor) || 0) / 100 : 0;
@@ -990,56 +760,55 @@ export default function DashboardProyectos() {
                                 sessionStorage.setItem('selectedProyectoId', p.id);
                                 router.push('/kore/proyectos/ver');
                               }}
-                              className="group border-y border-border/50 dark:border-white/5 bg-card/20 hover:bg-card/40 cursor-pointer transition-all duration-300"
+                              className="group border-b border-border/50 last:border-0 even:bg-muted/10 odd:bg-transparent hover:bg-muted/30 cursor-pointer transition-all duration-300"
                             >
-                              <td className="py-3 px-4 rounded-l-xl border-y border-l border-border group-hover:border-celeste-kore/20 transition-all duration-300">
+                              <td className="py-4 px-4 transition-all duration-300">
                                 <code className="text-xs font-mono font-bold text-celeste-kore bg-celeste-kore/10 px-2 py-1 rounded border border-celeste-kore/20">{getCode(p.id)}</code>
                               </td>
-                              <td className="py-4 border-y border-border group-hover:border-celeste-kore/20 transition-all duration-300">
-                                <p className="font-bold text-sm text-foreground">{p.nombre}</p>
+                              <td className="py-4 transition-all duration-300">
+                                <p className="font-bold text-sm text-foreground group-hover:text-celeste-kore transition-colors">{p.nombre}</p>
                               </td>
-                              <td className="py-4 border-y border-border group-hover:border-celeste-kore/20 transition-all duration-300">
+                              <td className="py-4 transition-all duration-300">
                                 <p className="text-sm text-foreground">{p.cliente_nombre || 'N/A'}</p>
                                 <p className="text-[10px] text-muted-foreground">{formatPhoneDisplay(p.cliente_telefono)}</p>
                               </td>
-                              <td className="py-4 border-y border-border group-hover:border-celeste-kore/20 transition-all duration-300">
-                                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all ${
-                                  p.estado === 'En Progreso' ? 'bg-celeste-kore/10 text-celeste-kore border-celeste-kore/20' :
-                                  p.estado === 'Finalizados' ? 'bg-muted text-muted-foreground border-border' :
-                                  'bg-azul-kore/10 text-azul-kore border-azul-kore/20 shadow-sm'
-                                }`}>
+                              <td className="py-4 transition-all duration-300">
+                                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all ${p.estado === 'En Progreso' ? 'bg-celeste-kore/10 text-celeste-kore border-celeste-kore/20' :
+                                    p.estado === 'Finalizados' ? 'bg-muted text-muted-foreground border-border' :
+                                      'bg-azul-kore/10 text-azul-kore border-azul-kore/20 shadow-sm'
+                                  }`}>
                                   {p.estado}
                                 </span>
                               </td>
-                              <td className="py-4 text-right border-y border-border group-hover:border-celeste-kore/20 transition-all duration-300">
-                                <p className="font-bold text-sm">Q{precio.toLocaleString('en-US', {minimumFractionDigits: 2})}</p>
+                              <td className="py-4 text-right transition-all duration-300">
+                                <p className="font-bold text-sm">Q{precio.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                               </td>
-                              <td className="py-4 text-right border-y border-border group-hover:border-celeste-kore/20 transition-all duration-300">
+                              <td className="py-4 text-right transition-all duration-300">
                                 <p className={`text-sm ${comision > 0 ? 'text-red-400 font-bold' : 'text-muted-foreground'}`}>
-                                  {comision > 0 ? `Q${comision.toLocaleString('en-US', {minimumFractionDigits: 2})}` : '—'}
+                                  {comision > 0 ? `Q${comision.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}
                                 </p>
                                 {comision > 0 && <p className="text-[10px] text-muted-foreground">{p.porcentaje_vendedor}%</p>}
                               </td>
-                              <td className="py-4 text-right border-y border-border group-hover:border-celeste-kore/20 transition-all duration-300">
+                              <td className="py-4 text-right transition-all duration-300">
                                 <p className={`text-sm ${desarrollo > 0 ? 'text-celeste-kore font-bold' : 'text-muted-foreground'}`}>
-                                  {desarrollo > 0 ? `Q${desarrollo.toLocaleString('en-US', {minimumFractionDigits: 2})}` : '—'}
+                                  {desarrollo > 0 ? `Q${desarrollo.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}
                                 </p>
                                 {desarrollo > 0 && <p className="text-[10px] text-muted-foreground">{p.porcentaje_desarrollo}%</p>}
                               </td>
-                              <td className="py-4 text-right border-y border-border group-hover:border-celeste-kore/20 transition-all duration-300">
+                              <td className="py-4 text-right transition-all duration-300">
                                 <p className={`text-sm ${iva > 0 ? 'text-azul-kore font-bold' : 'text-muted-foreground'}`}>
-                                  {iva > 0 ? `Q${iva.toLocaleString('en-US', {minimumFractionDigits: 2})}` : '—'}
+                                  {iva > 0 ? `Q${iva.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}
                                 </p>
                                 {iva > 0 && <p className="text-[10px] text-muted-foreground">{p.porcentaje_iva}%</p>}
                               </td>
-                              <td className="py-4 text-right border-y border-border group-hover:border-celeste-kore/20 transition-all duration-300">
-                                <p className={`text-sm ${doc > 0 ? 'text-azul-kore font-bold' : 'text-muted-foreground'}`}>
-                                  {doc > 0 ? `Q${doc.toLocaleString('en-US', {minimumFractionDigits: 2})}` : '—'}
+                              <td className="py-4 text-right transition-all duration-300">
+                                <p className={`text-sm ${doc > 0 ? 'text-amber-500 font-bold' : 'text-muted-foreground'}`}>
+                                  {doc > 0 ? `Q${doc.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}
                                 </p>
                                 {doc > 0 && <p className="text-[10px] text-muted-foreground">{p.porcentaje_doc}%</p>}
                               </td>
-                              <td className="py-4 pr-4 text-right rounded-r-xl border-y border-r border-border group-hover:border-celeste-kore/20 transition-all duration-300">
-                                <p className="font-black text-sm text-celeste-kore">Q{restante.toLocaleString('en-US', {minimumFractionDigits: 2})}</p>
+                              <td className="py-4 pr-4 text-right transition-all duration-300">
+                                <p className="font-black text-sm text-celeste-kore">Q{restante.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                               </td>
                             </tr>
                           );
@@ -1094,13 +863,13 @@ export default function DashboardProyectos() {
                   <div className="lg:hidden flex flex-col gap-2">
                     {paginatedProyectos.map((p) => {
                       return (
-                        <div 
-                          key={p.id} 
+                        <div
+                          key={p.id}
                           className="rounded-lg border border-celeste-kore/55 dark:border-white/10 bg-gradient-to-br from-card/90 to-card/50 backdrop-blur-lg p-2.5 flex items-center justify-between gap-3 shadow-none dark:shadow-md hover:border-celeste-kore/70 transition-all duration-300 cursor-pointer group"
                           onClick={() => {
-                          sessionStorage.setItem('selectedProyectoId', p.id);
-                          router.push('/kore/proyectos/ver');
-                        }}
+                            sessionStorage.setItem('selectedProyectoId', p.id);
+                            router.push('/kore/proyectos/ver');
+                          }}
                         >
                           {/* Left: Project Name and Client */}
                           <div className="flex-1 min-w-0">
@@ -1117,11 +886,10 @@ export default function DashboardProyectos() {
                               <code className="text-[7px] font-mono font-bold text-celeste-kore bg-celeste-kore/10 px-1 py-0.5 rounded border border-celeste-kore/20 shrink-0">
                                 {getCode(p.id)}
                               </code>
-                              <span className={`inline-flex items-center px-1 py-0.5 rounded text-[6px] font-black uppercase tracking-wider border shrink-0 ${
-                                p.estado === 'En Progreso' ? 'bg-celeste-kore/10 text-celeste-kore border-celeste-kore/20' :
-                                p.estado === 'Finalizados' ? 'bg-muted text-muted-foreground border-border' :
-                                'bg-azul-kore/10 text-azul-kore border-azul-kore/20 shadow-sm'
-                              }`}>
+                              <span className={`inline-flex items-center px-1 py-0.5 rounded text-[6px] font-black uppercase tracking-wider border shrink-0 ${p.estado === 'En Progreso' ? 'bg-celeste-kore/10 text-celeste-kore border-celeste-kore/20' :
+                                  p.estado === 'Finalizados' ? 'bg-muted text-muted-foreground border-border' :
+                                    'bg-azul-kore/10 text-azul-kore border-azul-kore/20 shadow-sm'
+                                }`}>
                                 {p.estado}
                               </span>
                             </div>
@@ -1190,7 +958,7 @@ export default function DashboardProyectos() {
                 </div>
                 <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest">Estado de Proyectos</h3>
               </div>
-              
+
               <div className="flex-1 flex flex-row items-center justify-between w-full mt-2 gap-2 sm:gap-4">
                 {/* Left Side: States */}
                 <div className="flex-[1] min-w-0 flex flex-col gap-2.5 sm:gap-4 items-start text-left">
@@ -1253,7 +1021,7 @@ export default function DashboardProyectos() {
 
             {/* Bar Chart */}
             <div className="rounded-2xl border border-celeste-kore/55 dark:border-border bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-xl p-4 sm:p-6 shadow-none dark:shadow-2xl dark:shadow-black/20">
-              
+
               {/* First Line: INGRESO & SWITCH */}
               <div className="flex items-center justify-between mb-4 gap-3">
                 <div className="flex items-center gap-2 sm:gap-3">
@@ -1268,12 +1036,11 @@ export default function DashboardProyectos() {
                   {["MES", "AÑO", "RANGO"].map((tab) => (
                     <button
                       key={tab}
-                      onClick={() => setChartTab(tab as any)}
-                      className={`px-3 py-1 sm:px-4 sm:py-1.5 rounded-full text-[9px] sm:text-[10px] font-bold transition-all cursor-pointer ${
-                        chartTab === tab
+                      onClick={() => setChartTab(tab as "MES" | "AÑO" | "RANGO")}
+                      className={`px-3 py-1 sm:px-4 sm:py-1.5 rounded-full text-[9px] sm:text-[10px] font-bold transition-all cursor-pointer ${chartTab === tab
                           ? "bg-celeste-kore text-white shadow-md"
                           : "text-muted-foreground hover:bg-muted/50"
-                      }`}
+                        }`}
                     >
                       {tab}
                     </button>
@@ -1361,7 +1128,7 @@ export default function DashboardProyectos() {
                               exit={{ opacity: 0 }}
                               transition={{ duration: 0.15 }}
                             />
-                            
+
                             {/* Floating Card */}
                             <motion.div
                               className="absolute top-full left-0 mt-2 z-50 w-[240px] bg-card border border-border rounded-2xl shadow-xl p-4 flex flex-col gap-3"
@@ -1417,11 +1184,10 @@ export default function DashboardProyectos() {
                                       }}
                                       whileHover={{ scale: 1.08 }}
                                       whileTap={{ scale: 0.95 }}
-                                      className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                                        isSelected
+                                      className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${isSelected
                                           ? "bg-celeste-kore text-white shadow-md"
                                           : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                                      }`}
+                                        }`}
                                     >
                                       {m}
                                     </motion.button>
@@ -1443,8 +1209,8 @@ export default function DashboardProyectos() {
                         className="filter-button w-full h-8 sm:h-9 flex items-center justify-between gap-1.5 px-3 bg-muted/20 border border-border/40 rounded-xl font-black uppercase tracking-widest text-foreground hover:bg-muted/30 transition-all cursor-pointer"
                       >
                         <span className="truncate">
-                          {selectedWeekIndex !== null 
-                            ? getWeeksOfMonth(selectedYear, selectedMonth)[selectedWeekIndex]?.label 
+                          {selectedWeekIndex !== null
+                            ? getWeeksOfMonth(selectedYear, selectedMonth)[selectedWeekIndex]?.label
                             : "Todas las semanas"}
                         </span>
                         <ChevronDown size={10} className="text-muted-foreground shrink-0" />
@@ -1478,11 +1244,10 @@ export default function DashboardProyectos() {
                                 }}
                                 whileHover={{ scale: 1.02, x: 2 }}
                                 whileTap={{ scale: 0.98 }}
-                                className={`w-full py-2 px-3 text-left text-xs font-black rounded-lg transition-all cursor-pointer ${
-                                  selectedWeekIndex === null
+                                className={`w-full py-2 px-3 text-left text-xs font-black rounded-lg transition-all cursor-pointer ${selectedWeekIndex === null
                                     ? "bg-celeste-kore text-white shadow-md"
                                     : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                                }`}
+                                  }`}
                               >
                                 TODAS LAS SEMANAS
                               </motion.button>
@@ -1500,11 +1265,10 @@ export default function DashboardProyectos() {
                                     }}
                                     whileHover={{ scale: 1.02, x: 2 }}
                                     whileTap={{ scale: 0.98 }}
-                                    className={`w-full py-2 px-3 text-left text-xs font-black rounded-lg transition-all cursor-pointer ${
-                                      isSelected
+                                    className={`w-full py-2 px-3 text-left text-xs font-black rounded-lg transition-all cursor-pointer ${isSelected
                                         ? "bg-celeste-kore text-white shadow-md"
                                         : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                                    }`}
+                                      }`}
                                   >
                                     {w.label}
                                   </motion.button>
@@ -1559,11 +1323,10 @@ export default function DashboardProyectos() {
                                   }}
                                   whileHover={{ scale: 1.04, x: 2 }}
                                   whileTap={{ scale: 0.96 }}
-                                  className={`w-full py-1.5 text-center text-xs font-black rounded-lg transition-all cursor-pointer ${
-                                    isSelected
+                                  className={`w-full py-1.5 text-center text-xs font-black rounded-lg transition-all cursor-pointer ${isSelected
                                       ? "bg-celeste-kore text-white shadow-md"
                                       : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                                  }`}
+                                    }`}
                                 >
                                   {y}
                                 </motion.button>
@@ -1698,11 +1461,10 @@ export default function DashboardProyectos() {
                                     onClick={() => handleDayClick(day.dateStr)}
                                     whileHover={{ scale: 1.1 }}
                                     whileTap={{ scale: 0.95 }}
-                                    className={`w-7 h-7 flex items-center justify-center text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
-                                      isSelected
+                                    className={`w-7 h-7 flex items-center justify-center text-[10px] font-bold rounded-lg transition-all cursor-pointer ${isSelected
                                         ? "bg-celeste-kore text-white shadow-md font-black"
                                         : "text-foreground hover:bg-muted/50"
-                                    }`}
+                                      }`}
                                   >
                                     {day.dayNum}
                                   </motion.button>
@@ -1716,7 +1478,7 @@ export default function DashboardProyectos() {
                   </div>
                 )}
               </div>
-              
+
               <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-sm bg-celeste-kore"></div>
@@ -1737,27 +1499,27 @@ export default function DashboardProyectos() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={barData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#71717a" }} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#71717a" }} tickFormatter={(val) => `Q${val/1000}k`} dy={-8} />
-                      <RechartsTooltip 
-                        cursor={{ fill: "rgba(255,255,255,0.05)" }} 
-                        contentStyle={{ 
-                          backgroundColor: "#18181b", 
-                          borderColor: "rgba(255,255,255,0.1)", 
-                          borderRadius: "12px", 
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#71717a" }} tickFormatter={(val) => `Q${val / 1000}k`} dy={-8} />
+                      <RechartsTooltip
+                        cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                        contentStyle={{
+                          backgroundColor: "#18181b",
+                          borderColor: "rgba(255,255,255,0.1)",
+                          borderRadius: "12px",
                           fontSize: "12px",
                           color: "#fff",
                           boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.3)"
                         }}
                         itemStyle={{ color: "#fff" }}
                         separator=""
-                        formatter={(value: any, name: any) => {
+                        formatter={(value: number | string | Array<number | string> | undefined, name: number | string | undefined) => {
                           const formattedValue = typeof value === "number"
                             ? value.toLocaleString()
-                            : value;
-                          if (name === "comision") return [formattedValue, "Comisión: Q "];
-                          if (name === "iva") return [formattedValue, "IVA: Q "];
-                          if (name === "precio") return [formattedValue, "Precio; Q "];
-                          return [formattedValue, name];
+                            : String(value ?? "");
+                          if (name === "comision") return [formattedValue, "Comisión: Q "] as [string, string];
+                          if (name === "iva") return [formattedValue, "IVA: Q "] as [string, string];
+                          if (name === "precio") return [formattedValue, "Precio; Q "] as [string, string];
+                          return [formattedValue, String(name ?? "")] as [string, string];
                         }}
                       />
                       <Bar dataKey="precio" stackId="a" fill="#B7494E" radius={[8, 8, 0, 0]} barSize={20} />
@@ -1790,8 +1552,16 @@ export default function DashboardProyectos() {
           </div>
 
           {loading ? (
-            <div className="flex justify-center items-center py-10">
-              <RefreshCw className="animate-spin text-celeste-kore" />
+            <div className="space-y-3 pt-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center space-x-4 p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+                  <Skeleton className="h-10 w-10 rounded-md" />
+                  <div className="space-y-2 flex-1">
+                    <Skeleton className="h-4 w-[200px]" />
+                    <Skeleton className="h-3 w-[150px]" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : proyectosConFecha.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground border-t border-border/30">
@@ -1817,23 +1587,21 @@ export default function DashboardProyectos() {
                     <div className="flex items-center gap-3">
                       <div className="text-right">
                         <p className="text-sm font-bold">{formatDate(p.fecha_entrega)}</p>
-                        <p className={`text-[10px] font-bold ${
-                          isPast ? 'text-celeste-kore' :
-                          isToday ? 'text-red-400' :
-                          isUrgent ? 'text-azul-kore' :
-                          'text-muted-foreground'
-                        }`}>
+                        <p className={`text-[10px] font-bold ${isPast ? 'text-celeste-kore' :
+                            isToday ? 'text-red-400' :
+                              isUrgent ? 'text-azul-kore' :
+                                'text-muted-foreground'
+                          }`}>
                           {isPast ? `Vencido hace ${Math.abs(days)} días` :
-                           isToday ? 'Hoy' :
-                           `En ${days} días`}
+                            isToday ? 'Hoy' :
+                              `En ${days} días`}
                         </p>
                       </div>
-                      <div className={`w-3 h-3 rounded-full ${
-                        isPast ? 'bg-celeste-kore' :
-                        isToday ? 'bg-red-400' :
-                        isUrgent ? 'bg-azul-kore' :
-                        'bg-celeste-kore'
-                      }`} />
+                      <div className={`w-3 h-3 rounded-full ${isPast ? 'bg-celeste-kore' :
+                          isToday ? 'bg-red-400' :
+                            isUrgent ? 'bg-azul-kore' :
+                              'bg-celeste-kore'
+                        }`} />
                     </div>
                   </div>
                 );
@@ -1849,7 +1617,7 @@ export default function DashboardProyectos() {
         isOpen={!!qrProyecto}
         proyecto={qrProyecto}
         onClose={() => setQrProyecto(null)}
-        onSuccess={fetchData}
+        onSuccess={refetch}
       />
     </div>
   );

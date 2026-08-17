@@ -21,7 +21,6 @@ export default async function ProyectoPublicPage({ searchParams }: PageProps) {
   let code = "N/A";
   let nombre = "Proyecto sin nombre";
   let cliente = "N/A";
-  let vendedor = "N/A";
   
   let usuario = typeof params.usr === "string" ? params.usr : null;
   let password = typeof params.pwd === "string" ? params.pwd : null;
@@ -40,20 +39,22 @@ export default async function ProyectoPublicPage({ searchParams }: PageProps) {
         .select(`
           nombre,
           cliente_nombre,
-          otros_campos,
-          vendedor:profiles!vendedor_id(nombre)
+          otros_campos
         `)
         .eq("id", projectId)
         .single();
 
       if (dbProyecto) {
-        const proj = dbProyecto as any;
+        const proj = dbProyecto as {
+          nombre?: string | null;
+          cliente_nombre?: string | null;
+          otros_campos?: { usuario_acceso?: string; pass_acceso?: string; url_acceso?: string } | null;
+        };
         if (proj.nombre) nombre = proj.nombre;
         if (proj.cliente_nombre) cliente = proj.cliente_nombre;
-        if (proj.vendedor?.nombre) vendedor = proj.vendedor.nombre;
         
         if (proj.otros_campos) {
-          const otros = proj.otros_campos as any;
+          const otros = proj.otros_campos;
           if (otros.usuario_acceso) usuario = otros.usuario_acceso;
           if (otros.pass_acceso) password = otros.pass_acceso;
           if (otros.url_acceso) loginUrl = otros.url_acceso;
@@ -66,7 +67,6 @@ export default async function ProyectoPublicPage({ searchParams }: PageProps) {
     if (typeof params.c === "string") code = params.c;
     if (typeof params.n === "string") nombre = params.n;
     if (typeof params.cl === "string") cliente = params.cl;
-    if (typeof params.v === "string") vendedor = params.v;
   }
 
   // Formatear URL para asegurar que tenga protocolo absoluto si es externa

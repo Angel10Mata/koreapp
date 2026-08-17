@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import Image from "next/image";
@@ -14,14 +14,9 @@ interface LogoKoreProps {
 
 export default function LogoKore({
   noAnimation = false,
-  backgroundEffect = "blur",
 }: LogoKoreProps) {
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [mounted] = useState(() => typeof window !== "undefined");
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();

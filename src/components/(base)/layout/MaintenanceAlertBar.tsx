@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, X, ChevronRight, Bell } from "lucide-react";
 import { getProyectos } from "@/components/(Kore)/proyectos/lib/actions";
+import { Proyecto } from "@/components/(Kore)/proyectos/lib/zod";
 
 const ALERT_DAYS = 5;
 
@@ -44,7 +45,7 @@ export function MaintenanceAlertBar() {
     try {
       const data = await getProyectos();
       const alertsFound: AlertProyecto[] = [];
-      (data || []).forEach((p: any) => {
+      (data || []).forEach((p: Proyecto) => {
         if (!p.mantenimiento_activo || !p.mantenimiento_fecha_cobro) return;
         const days = getDaysUntil(p.mantenimiento_fecha_cobro);
         if (days >= 0 && days <= ALERT_DAYS) {
@@ -68,6 +69,7 @@ export function MaintenanceAlertBar() {
   }, [isProyectosPage]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAlerts();
   }, [fetchAlerts, pathname]);
 

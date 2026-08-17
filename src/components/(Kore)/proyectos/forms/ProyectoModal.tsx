@@ -1,17 +1,23 @@
 "use client";
+import React from 'react';
 
 import { useEffect, useState, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, FieldErrors, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, X, Briefcase, Save, Plus, Trash2, Receipt } from "lucide-react";
+import { Plus, Trash2, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
-import Swal from "sweetalert2";
+import { toast } from "react-toastify";
+import { ModalShell, ModalLabel, ModalInput, ModalSelect, ModalFooter, ModalSubmit } from "@/components/ui/general-modal";
 import {
   proyectoSchema,
   ProyectoFormValues,
   TIPOS_DEDUCCION,
   TipoDeduccion,
+  Proyecto,
+  Profile,
+  Cliente,
+  DeduccionItem
 } from "../lib/zod";
 import {
   createProyecto,
@@ -20,62 +26,35 @@ import {
 import { useUserContext } from "@/components/(base)/providers/UserProvider";
 import { createClient } from "@/utils/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { KorePhoneInput } from "@/components/ui/KorePhoneInput";
 
 interface ProyectoModalProps {
   isOpen: boolean;
   onClose: () => void;
-  proyecto?: any | null;
+  proyecto?: Proyecto | null;
 }
 
 // ── Shared micro-components ──────────────────────────────────────────────────
 
 const Label = ({ className, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) => (
-  <label
-    {...props}
-    className={cn(
-      "text-xs font-semibold leading-none text-foreground/70 uppercase tracking-wider",
-      className
-    )}
-  />
+  <ModalLabel className={className} {...props} />
 );
 
-const Input = ({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) => (
-  <input
-    {...props}
-    className={cn(
-      "flex h-10 w-full rounded-lg border border-input bg-background/50 px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600/50 transition-all outline-none disabled:opacity-50 disabled:bg-muted/30 disabled:cursor-not-allowed",
-      className
-    )}
-  />
-);
+const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(({ className, ...props }, ref) => (
+  <ModalInput ref={ref} className={className} {...props} />
+));
+Input.displayName = "Input";
 
-const SelectWrap = ({
-  className,
-  children,
-  ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement>) => (
-  <div className="relative">
-    <select
-      {...props}
-      className={cn(
-        "flex h-10 w-full appearance-none rounded-lg border border-input bg-background/50 px-3 py-2 text-sm outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-red-600/50 transition-all disabled:opacity-50 disabled:bg-muted/30 disabled:cursor-not-allowed",
-        className
-      )}
-    >
-      {children}
-    </select>
-    <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-      <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </div>
-  </div>
-);
+const SelectWrap = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(({ className, children, ...props }, ref) => (
+  <ModalSelect ref={ref} className={className} {...props}>
+    {children}
+  </ModalSelect>
+));
+SelectWrap.displayName = "SelectWrap";
 
 const formatPhoneDisplay = (phone: string | null | undefined): string => {
   if (!phone) return "";
   const clean = phone.trim();
+  if (!clean) return "";
   const cleanNoSpaces = clean.replace(/\s+/g, "");
   const gtMatch = cleanNoSpaces.match(/^\+502(\d{4})(\d{4})$/);
   if (gtMatch) return `${gtMatch[1]}-${gtMatch[2]}`;
@@ -102,34 +81,9 @@ const DEFAULT_PCT: Record<string, number> = {
   "Desarrollo": 0,
 };
 
-const formatToE164 = (phone: string | null | undefined): string => {
-  if (!phone) return "";
-  const clean = phone.trim().replace(/\s+/g, "");
-  if (!clean) return "";
-  if (clean.startsWith("+")) return clean;
-  // Si tiene 8 dígitos (formato estándar de Guatemala), anteponer +502
-  if (clean.length === 8 && /^\d+$/.test(clean)) {
-    return `+502${clean}`;
-  }
-  // Si solo son dígitos y no tiene +, anteponer +502
-  if (/^\d+$/.test(clean)) {
-    return `+502${clean}`;
-  }
-  return clean;
-};
-
-const stripCountryCode = (phone: string | null | undefined): string => {
-  if (!phone) return "";
-  const clean = phone.trim().replace(/\s+/g, "");
-  if (clean.startsWith("+502")) return clean.slice(4).trim();
-  if (clean.startsWith("502") && clean.length === 11) return clean.slice(3).trim();
-  return clean;
-};
-
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoModalProps) {
-  const isEditing = !!proyecto;
   const { effectiveRole } = useUserContext();
   const isDeveloper = effectiveRole === "proyectos";
   const supabase = createClient();
@@ -150,7 +104,7 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
 
   const getUserName = (userId: string): string | null => {
     if (!userId) return null;
-    const user = users?.find((u: any) => u.id === userId);
+    const user = (users as Profile[])?.find((u: Profile) => u.id === userId);
     if (!user) return null;
     return user.nombre || "Usuario";
   };
@@ -165,7 +119,7 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
     control,
     formState: { errors, isSubmitting },
   } = useForm<ProyectoFormValues>({
-    resolver: zodResolver(proyectoSchema) as any,
+    resolver: zodResolver(proyectoSchema) as unknown as Resolver<ProyectoFormValues>,
     defaultValues: {
       nombre: "",
       cliente_nombre: "",
@@ -191,9 +145,9 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
   // ── Sincronización de Vendedor con Deducción de Comisión ──
   const currentDeducciones = watch("deducciones") || [];
   const vendedorId = watch("vendedor_id");
-  const firstComision = currentDeducciones.find((d: any) => 
+  const firstComision = currentDeducciones.find((d: DeduccionItem) => 
     (d.tipo === "Vendedor" || d.tipo === "Comisión" || d.tipo === "vendedor") && d.usuario_id
-  ) || currentDeducciones.find((d: any) => 
+  ) || currentDeducciones.find((d: DeduccionItem) => 
     d.tipo === "Vendedor" || d.tipo === "Comisión" || d.tipo === "vendedor"
   );
   const firstComisionUsuarioId = firstComision?.usuario_id || "";
@@ -238,7 +192,7 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
 
   const filteredUsers = useMemo(() => {
     if (!userSearchQuery || userSearchQuery.trim().length < 1) return [];
-    return (users || []).filter((u: any) =>
+    return ((users as Profile[]) || []).filter((u: Profile) =>
       u.nombre?.toLowerCase().includes(userSearchQuery.toLowerCase())
     );
   }, [users, userSearchQuery]);
@@ -266,17 +220,23 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
 
   const filteredClientes = useMemo(() => {
     if (!clientSearchQuery || clientSearchQuery.trim().length < 2) return [];
-    return (clientes || []).filter((c: any) =>
+    return ((clientes as Cliente[]) || []).filter((c: Cliente) =>
       c.nombre?.toLowerCase().includes(clientSearchQuery.toLowerCase())
     );
   }, [clientes, clientSearchQuery]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (userAutocompleteRef.current && !userAutocompleteRef.current.contains(e.target as Node)) {
+      if (
+        userAutocompleteRef.current &&
+        !userAutocompleteRef.current.contains(e.target as Node)
+      ) {
         setShowUserSuggestions(false);
       }
-      if (clientAutocompleteRef.current && !clientAutocompleteRef.current.contains(e.target as Node)) {
+      if (
+        clientAutocompleteRef.current &&
+        !clientAutocompleteRef.current.contains(e.target as Node)
+      ) {
         setShowClientSuggestions(false);
       }
     };
@@ -284,114 +244,89 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ── Cargar / resetear al abrir ──
+  // Cargar datos al editar o resetear al crear
   useEffect(() => {
     if (isOpen) {
       if (proyecto) {
         reset({
-          nombre:           proyecto.nombre           || "",
-          cliente_nombre:   proyecto.cliente_nombre   || "",
-          cliente_nit:      proyecto.cliente_nit      || "",
+          nombre: proyecto.nombre || "",
+          cliente_nombre: proyecto.cliente_nombre || "",
+          cliente_nit: proyecto.cliente_nit || "",
           cliente_telefono: proyecto.cliente_telefono || "",
-          cliente_correo:   proyecto.cliente_correo   || "",
-          fecha_entrega:    proyecto.fecha_entrega     || "",
-          precio:           proyecto.precio            || 0,
-          monto_mensual_fijo: proyecto.monto_mensual_fijo || 0,
-          mantenimiento_fecha_cobro: (() => {
-            if (!proyecto.mantenimiento_fecha_cobro) return "";
-            try {
-              const d = new Date(proyecto.mantenimiento_fecha_cobro);
-              return isNaN(d.getTime()) ? "" : d.toISOString().split('T')[0];
-            } catch {
-              return "";
-            }
-          })(),
-          estado:           proyecto.estado            || "En Progreso",
-          vendedor_id:      proyecto.vendedor_id       || "",
-          deducciones:      proyecto.deducciones       || [],
+          cliente_correo: proyecto.cliente_correo || "",
+          fecha_entrega: proyecto.fecha_entrega ? proyecto.fecha_entrega.split("T")[0] : "",
+          precio: Number(proyecto.precio) || 0,
+          monto_mensual_fijo: Number(proyecto.monto_mensual_fijo) || 0,
+          mantenimiento_fecha_cobro: proyecto.mantenimiento_fecha_cobro ? proyecto.mantenimiento_fecha_cobro.split("T")[0] : "",
+          estado: proyecto.estado || "En Progreso",
+          vendedor_id: proyecto.vendedor_id || "",
+          deducciones: (proyecto.deducciones || []).map((d) => ({
+            tipo: d.tipo,
+            porcentaje: Number(d.porcentaje) || 0,
+            descripcion: d.descripcion || "",
+            usuario_id: d.usuario_id || "",
+          })),
         });
       } else {
         reset({
-          nombre: "", cliente_nombre: "", cliente_nit: "",
-          cliente_telefono: "", cliente_correo: "",
-          fecha_entrega: "", precio: 0, monto_mensual_fijo: 0, mantenimiento_fecha_cobro: "", estado: "En Progreso",
+          nombre: "",
+          cliente_nombre: "",
+          cliente_nit: "",
+          cliente_telefono: "",
+          cliente_correo: "",
+          fecha_entrega: "",
+          precio: 0,
+          monto_mensual_fijo: 0,
+          mantenimiento_fecha_cobro: "",
+          estado: "En Progreso",
           vendedor_id: "",
-          deducciones: [],
+          deducciones: [
+            { tipo: "Vendedor", porcentaje: 10, descripcion: "Comisión Vendedor", usuario_id: "" },
+            { tipo: "Desarrollador", porcentaje: 25, descripcion: "Desarrollo", usuario_id: "" },
+            { tipo: "IVA", porcentaje: 12, descripcion: "Impuesto al Valor Agregado", usuario_id: "" },
+            { tipo: "Documentación", porcentaje: 3, descripcion: "Documentación", usuario_id: "" },
+            { tipo: "Kore", porcentaje: 50, descripcion: "Retención Kore", usuario_id: "" },
+          ],
         });
-        setNewDed({ tipo: "Vendedor", porcentaje: 10, descripcion: "", usuario_id: "" });
       }
-      setUserSearchQuery("");
       setShowAddForm(false);
+      setUserSearchQuery("");
     }
   }, [isOpen, proyecto, reset]);
 
-  // ── Submit ──
+  const isEditing = !!proyecto;
+
   const onSubmit = async (data: ProyectoFormValues) => {
-    // Phone number is already formatted as E164 from KorePhoneInput
     const res = isEditing
       ? await updateProyecto(proyecto.id, data)
       : await createProyecto(data);
 
-    if (res.error) {
-      Swal.fire({ icon: "error", title: "Error", text: res.error, background: "#18181b", color: "#fff" });
+    if (res?.error) {
+      toast.error(res.error);
     } else {
-      Swal.fire({
-        icon: "success",
-        title: isEditing ? "Proyecto Actualizado" : "Proyecto Creado",
-        toast: true, position: "top-end", showConfirmButton: false,
-        timer: 3000, background: "#18181b", color: "#fff",
-      });
+      toast.success(isEditing ? "Proyecto Actualizado" : "Proyecto Creado");
       onClose();
     }
   };
 
-  const onInvalid = (errs: any) => console.error("❌ Validación fallida:", errs);
+  const onInvalid = (errs: FieldErrors<ProyectoFormValues>) => console.error("❌ Validación fallida:", errs);
 
   if (!isOpen) return null;
 
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-[110] bg-background md:bg-background/60 md:backdrop-blur-sm md:flex md:items-center md:justify-center md:p-4 md:overflow-y-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 40 }}
-          transition={{ duration: 0.25, ease: "easeOut" }}
-          className="w-full h-full flex flex-col bg-card overflow-hidden
-            md:h-auto md:max-w-2xl md:rounded-3xl md:shadow-none dark:md:shadow-2xl md:border md:border-celeste-kore/55 dark:md:border-border/50 md:my-auto"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-border/50 bg-muted/5 sticky top-0 z-10 backdrop-blur-md">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/40 flex items-center justify-center border border-red-200 dark:border-red-900/30">
-                <Briefcase size={20} className="text-celeste-kore" />
-              </div>
-              <div>
-                <h3 className="text-xl font-black tracking-tight text-foreground uppercase">
-                  {isEditing ? "Editar Proyecto" : "Nuevo Proyecto"}
-                </h3>
-                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
-                  {isEditing ? "Modificando información" : "Registro de datos"}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 rounded-full hover:bg-muted/50 transition-colors cursor-pointer"
-            >
-              <X size={20} className="text-muted-foreground" />
-            </button>
-          </div>
-
-          {/* Scrollable body */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 custom-scrollbar md:max-h-[70vh]">
-            <form
-              id="proyecto-form"
-              onSubmit={handleSubmit(onSubmit as any, onInvalid)}
-              className="space-y-6"
-            >
-              {/* ── Información General ── */}
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEditing ? "Editar Proyecto" : "Nuevo Proyecto"}
+      subtitle={isEditing ? "Modificando información" : "Registro de datos"}
+      maxWidth="2xl"
+    >
+      <form
+        id="proyecto-form"
+        onSubmit={handleSubmit(onSubmit, onInvalid)}
+        className="space-y-6"
+      >
+        {/* ── Información General ── */}
               <div className="space-y-4">
                 <h4 className="text-xs font-black text-celeste-kore uppercase tracking-widest border-b border-border/50 pb-2">
                   Información General
@@ -447,7 +382,7 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
                         setShowClientSuggestions(val.trim().length >= 2);
                         
                         // Si el nombre no coincide exactamente con un cliente existente, vaciar los campos auto-completados
-                        const matched = (clientes || []).find((c: any) => c.nombre?.toLowerCase() === val.trim().toLowerCase());
+                        const matched = ((clientes as Cliente[]) || []).find((c: Cliente) => c.nombre?.toLowerCase() === val.trim().toLowerCase());
                         if (matched) {
                           setValue("cliente_nit", matched.nit || "");
                           setValue("cliente_telefono", matched.telefono || "");
@@ -469,7 +404,7 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
                           transition={{ duration: 0.15 }}
                           className="absolute top-full left-0 right-0 z-50 mt-1 rounded-xl border border-border/60 bg-popover text-popover-foreground shadow-2xl shadow-black/40 overflow-hidden max-h-48 overflow-y-auto"
                         >
-                          {filteredClientes.map((c: any) => (
+                          {filteredClientes.map((c: Cliente) => (
                             <li
                               key={c.id}
                               onMouseDown={() => {
@@ -480,12 +415,12 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
                                 setValue("cliente_correo", c.correo || "");
                                 setShowClientSuggestions(false);
                               }}
-                              className="px-4 py-2 text-sm hover:bg-muted cursor-pointer transition-colors text-left"
+                              className="px-3.5 py-2.5 hover:bg-celeste-kore/10 hover:text-celeste-kore cursor-pointer transition-colors text-xs flex flex-col gap-0.5 border-b border-border/30 last:border-0"
                             >
-                              <p className="font-bold text-foreground">{c.nombre}</p>
-                              {c.nit && (
-                                <p className="text-[10px] text-muted-foreground">NIT: {c.nit}</p>
-                              )}
+                              <span className="font-bold">{c.nombre}</span>
+                              <span className="text-[10px] text-muted-foreground">
+                                NIT: {c.nit || "C/F"} · Tel: {c.telefono || "N/A"}
+                              </span>
                             </li>
                           ))}
                         </motion.ul>
@@ -564,7 +499,7 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
                           const val = e.target.value;
                           setValue("vendedor_id", val);
                           
-                          const comisionIdx = currentDeducciones.findIndex((d: any) => d.tipo === "Vendedor");
+                          const comisionIdx = currentDeducciones.findIndex((d: DeduccionItem) => d.tipo === "Vendedor");
                           if (val) {
                             if (comisionIdx >= 0) {
                               setValue(`deducciones.${comisionIdx}.usuario_id`, val);
@@ -584,7 +519,7 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
                         }}
                       >
                         <option value="">Seleccione un vendedor...</option>
-                        {users?.map((u: any) => (
+                        {(users as Profile[])?.map((u: Profile) => (
                           <option key={u.id} value={u.id}>
                             {u.nombre || "Sin nombre"}
                           </option>
@@ -784,7 +719,7 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
                                       transition={{ duration: 0.15 }}
                                       className="absolute top-full left-0 right-0 z-50 mt-1 rounded-xl border border-border/60 bg-popover text-popover-foreground shadow-2xl shadow-black/40 overflow-hidden max-h-48 overflow-y-auto"
                                     >
-                                      {filteredUsers.map((u: any) => (
+                                      {filteredUsers.map((u: Profile) => (
                                         <li
                                           key={u.id}
                                           onMouseDown={() => {
@@ -823,29 +758,15 @@ export default function ProyectoModal({ isOpen, onClose, proyecto }: ProyectoMod
                 </div>
               )}
             </form>
-          </div>
 
           {/* Footer */}
-          <div className="p-4 md:p-6 border-t border-border/50 bg-card md:bg-muted/5 flex justify-end gap-3 shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2.5 rounded-xl border border-border/50 bg-background hover:bg-muted/50 transition-colors text-xs font-bold uppercase tracking-widest cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button
+          <ModalFooter>
+            <ModalSubmit
               form="proyecto-form"
-              type="submit"
-              disabled={isSubmitting}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl border border-celeste-kore bg-transparent text-celeste-kore hover:bg-celeste-kore/10 transition-all text-xs font-black uppercase tracking-widest cursor-pointer disabled:opacity-50"
-            >
-              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              {isEditing ? "Guardar" : "Crear"}
-            </button>
-          </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>
+              isLoading={isSubmitting}
+              text={isEditing ? "Guardar" : "Crear"}
+            />
+          </ModalFooter>
+    </ModalShell>
   );
 }

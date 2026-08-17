@@ -8,14 +8,13 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useUserContext } from "@/components/(base)/providers/UserProvider";
-import { deleteProyecto, getProyectos } from "@/components/(Kore)/proyectos/lib/actions";
+import { useProyectos, useDeleteProyecto } from "@/components/(Kore)/proyectos/lib/hooks";
 import Swal from "sweetalert2";
-import { useTheme } from "next-themes";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-
+import { Proyecto, DeduccionItemConUsuario } from "@/components/(Kore)/proyectos/lib/zod";
 
 interface ProyectoDetalleProps {
-  proyecto?: any;
+  proyecto?: Proyecto;
 }
 
 const DASH_TIPO_STYLE: Record<string, string> = {
@@ -27,7 +26,15 @@ const DASH_TIPO_STYLE: Record<string, string> = {
   "Desarrollador": "bg-sky-500/10 text-sky-400 border-sky-500/25",
 };
 
-function DetailDeduccionItem({ d, forceOpen, precio }: { d: any; forceOpen: boolean; precio: number }) {
+interface DetalleDed {
+  tipo: string;
+  porcentaje: number | string;
+  descripcion?: string;
+  usuario_nombre?: string;
+  usuario_id?: string;
+}
+
+function DetailDeduccionItem({ d, forceOpen, precio }: { d: DetalleDed; forceOpen: boolean; precio: number }) {
   const [open, setOpen] = useState(false);
   const userName = d.usuario_nombre || "";
   const hasDetails = !!(userName || d.descripcion);
@@ -47,27 +54,29 @@ function DetailDeduccionItem({ d, forceOpen, precio }: { d: any; forceOpen: bool
           {d.tipo}
         </span>
         <div className="flex-1" />
-        <div className="flex flex-col items-end shrink-0 text-right">
-          <span className="text-sm font-black tabular-nums text-foreground">
-            Q{valorMonetario.toLocaleString('en-US', {minimumFractionDigits: 2})}
-          </span>
-          <span className="text-[10px] font-bold text-muted-foreground tabular-nums leading-none mt-0.5">
-            {Number(d.porcentaje)}%
-          </span>
+        <div className="flex items-center justify-end shrink-0 w-[120px]">
+          <div className="flex flex-col items-end shrink-0 text-right">
+            <span className="text-sm font-black tabular-nums text-foreground">
+              Q{valorMonetario.toLocaleString('en-US', {minimumFractionDigits: 2})}
+            </span>
+            <span className="text-[10px] font-bold text-muted-foreground tabular-nums leading-none mt-0.5">
+              {Number(d.porcentaje)}%
+            </span>
+          </div>
+          {hasDetails ? (
+            <ChevronDown
+              size={12}
+              className={`text-muted-foreground/40 transition-transform duration-200 shrink-0 ml-3 ${
+                isOpen ? "rotate-180" : ""
+              }`}
+            />
+          ) : (
+            <ChevronDown
+              size={12}
+              className="text-transparent shrink-0 pointer-events-none select-none ml-3"
+            />
+          )}
         </div>
-        {hasDetails ? (
-          <ChevronDown
-            size={12}
-            className={`text-muted-foreground/40 transition-transform duration-200 shrink-0 ${
-              isOpen ? "rotate-180" : ""
-            }`}
-          />
-        ) : (
-          <ChevronDown
-            size={12}
-            className="text-transparent shrink-0 pointer-events-none select-none"
-          />
-        )}
       </div>
 
       <AnimatePresence initial={false}>
@@ -106,7 +115,7 @@ function DetailDedListWithToggle({
   mant,
   restante,
 }: {
-  deds: any[];
+  deds: DetalleDed[];
   totalPct: number;
   precio: number;
   mant: number;
@@ -145,15 +154,18 @@ function DetailDedListWithToggle({
         )}
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs font-black px-2 py-1 rounded-lg border text-destructive border-destructive/20 bg-destructive/10">
-            Total: Q{totalDeduccionesMonetario.toLocaleString("en-US", { minimumFractionDigits: 2 })} ({totalPct}%)
+            Total de proyecto: Q{totalDeduccionesMonetario.toLocaleString("en-US", { minimumFractionDigits: 2 })}
           </span>
           {sortedDeds.length > 0 && (
-            <ChevronDown
-              size={13}
-              className={`text-muted-foreground/50 transition-transform duration-200 ${
-                allExpanded ? "rotate-180" : ""
-              }`}
-            />
+            <div className="p-1 rounded-md bg-muted/40 dark:bg-white/10 flex items-center justify-center ml-1">
+              <ChevronDown
+                size={16}
+                strokeWidth={2.5}
+                className={`text-foreground/80 transition-transform duration-200 ${
+                  allExpanded ? "rotate-180" : ""
+                }`}
+              />
+            </div>
           )}
         </div>
       </button>
@@ -178,14 +190,16 @@ function DetailDedListWithToggle({
         )}
       </AnimatePresence>
 
-      <div className="space-y-2 pt-2 text-xs sm:text-sm border-t border-zinc-100 dark:border-zinc-800/60">
+      <div className="space-y-2 pt-2 text-xs sm:text-sm border-t border-zinc-100 dark:border-zinc-800/60 px-4">
         <div className="flex justify-between items-center gap-2 py-0.5">
           <span className="text-zinc-500 dark:text-zinc-400 min-w-0 truncate">
             Total Deducibles ({totalPct}%):
           </span>
-          <span className="font-bold shrink-0 text-right text-destructive">
-            Q{totalDeduccionesMonetario.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-          </span>
+          <div className="flex justify-end w-[120px]">
+            <span className="font-bold shrink-0 text-right text-destructive pr-[26px]">
+              Q{totalDeduccionesMonetario.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </span>
+          </div>
         </div>
 
         {mant > 0 && (
@@ -193,17 +207,21 @@ function DetailDedListWithToggle({
             <span className="text-zinc-500 dark:text-zinc-400 min-w-0 truncate">
               Mantenimiento Mensual:
             </span>
-            <span className="font-bold shrink-0 text-right text-celeste-kore">
-              Q{mant.toLocaleString("en-US", { minimumFractionDigits: 2 })} / mes
-            </span>
+            <div className="flex justify-end w-[120px]">
+              <span className="font-bold shrink-0 text-right text-celeste-kore pr-[26px]">
+                Q{mant.toLocaleString("en-US", { minimumFractionDigits: 2 })} / mes
+              </span>
+            </div>
           </div>
         )}
 
         <div className="flex justify-between items-center gap-2 py-1.5 border-t border-zinc-200 dark:border-zinc-800/80 pt-2 font-black text-sm sm:text-base text-celeste-kore">
           <span className="min-w-0 truncate">Saldo Final:</span>
-          <span className="shrink-0 text-right">
-            Q{restante.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-          </span>
+          <div className="flex justify-end w-[120px]">
+            <span className="shrink-0 text-right pr-[26px]">
+              Q{restante.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -230,14 +248,34 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
     }
   }, [router, proyectoProp]);
 
-  const [proyecto, setProyecto] = useState<any | null>(proyectoProp ?? null);
-  const [loadingProyecto, setLoadingProyecto] = useState(!!paramId && !proyectoProp);
+  const [proyecto, setProyecto] = useState<Proyecto | null>(proyectoProp ?? null);
   const [notFound, setNotFound] = useState(false);
 
   const { effectiveRole } = useUserContext();
   const isDeveloper = effectiveRole === "proyectos";
-  const { resolvedTheme } = useTheme();
   const [showRiskZone, setShowRiskZone] = useState(false);
+  const [hoveredSegment, setHoveredSegment] = useState<{name: string, value: number, color: string} | null>(null);
+
+  const { data: proyectos, isLoading: loadingProyectos } = useProyectos();
+  const deleteMutation = useDeleteProyecto();
+  
+  // Update proyecto state when data is loaded
+  useEffect(() => {
+    if (proyectoProp) {
+      setProyecto(proyectoProp);
+      return;
+    }
+    if (!paramId || !proyectos) return;
+    
+    const found = proyectos.find((p: Proyecto) => p.id === paramId || getCode(p.id) === paramId);
+    if (found) {
+      setProyecto(found);
+    } else {
+      setNotFound(true);
+    }
+  }, [paramId, proyectoProp, proyectos]);
+
+  const loadingProyecto = (!proyectoProp && !!paramId) && (loadingProyectos || !proyecto);
 
   // Role guard
   useEffect(() => {
@@ -246,28 +284,8 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
     }
   }, [effectiveRole, router]);
 
-  // Fetch project by ID from URL when no prop is passed
-  useEffect(() => {
-    if (!paramId || proyectoProp) return;
-    let active = true;
-    setLoadingProyecto(true);
-    getProyectos()
-      .then((data) => {
-        if (!active) return;
-        const found = data.find((p: any) => p.id === paramId || getCode(p.id) === paramId);
-        if (found) {
-          setProyecto(found);
-        } else {
-          setNotFound(true);
-        }
-      })
-      .catch(() => { if (active) setNotFound(true); })
-      .finally(() => { if (active) setLoadingProyecto(false); });
-    return () => { active = false; };
-  }, [paramId, proyectoProp]);
-
   // Loading state
-  if (loadingProyecto) {
+  if (loadingProyecto && !notFound) {
     return (
       <div className="flex-1 flex items-center justify-center p-4 pt-32 md:p-8 md:pt-24">
         <div className="flex flex-col items-center gap-4 text-muted-foreground">
@@ -319,7 +337,7 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
 
   const handleDeleteProyecto = async () => {
     const isDark = typeof window !== "undefined" && document.documentElement.classList.contains("dark");
-    let timerInterval: any;
+    let timerInterval: ReturnType<typeof setInterval>;
     const result = await Swal.fire({
       title: "Eliminar Proyecto",
       html: 'Esta acción no se puede deshacer.<br/><br/>El botón se habilitará en <b class="text-red-500 font-bold">7</b> segundos.',
@@ -358,28 +376,13 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
     });
 
     if (result.isConfirmed) {
-      const res = await deleteProyecto(proyecto.id);
-      if (res.error) {
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: res.error,
-          background: isDark ? "#09090b" : "#ffffff",
-          color: isDark ? "#ffffff" : "#000000",
-        });
-      } else {
-        Swal.fire({
-          icon: "success",
-          title: "Eliminado",
-          toast: true,
-          position: "top-end",
-          showConfirmButton: false,
-          timer: 3000,
-          background: isDark ? "#09090b" : "#ffffff",
-          color: isDark ? "#ffffff" : "#000000",
-        });
-        router.push("/kore/proyectos");
-      }
+      deleteMutation.mutate(proyecto.id, {
+        onSuccess: (res) => {
+          if (!res.error) {
+            router.push("/kore/proyectos");
+          }
+        }
+      });
     }
   };
 
@@ -388,8 +391,8 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
   
   const getDedSum = (tipo: string) => {
     return (proyecto.deducciones || [])
-      .filter((d: any) => d.tipo.toLowerCase() === tipo.toLowerCase() || (tipo === "Vendedor" && d.tipo === "Comisión") || (tipo === "Desarrollador" && d.tipo === "Desarrollo"))
-      .reduce((acc: number, curr: any) => acc + (precio * (Number(curr.porcentaje) || 0) / 100), 0);
+      .filter((d: DeduccionItemConUsuario) => d.tipo.toLowerCase() === tipo.toLowerCase() || (tipo === "Vendedor" && d.tipo === "Comisión") || (tipo === "Desarrollador" && d.tipo === "Desarrollo"))
+      .reduce((acc: number, curr: DeduccionItemConUsuario) => acc + (precio * (Number(curr.porcentaje) || 0) / 100), 0);
   };
 
   const iva = getDedSum("IVA");
@@ -398,7 +401,7 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
   const dev = getDedSum("Desarrollador");
   const kore = getDedSum("Kore");
 
-  const totalDeducciones = (proyecto.deducciones || []).reduce((acc: number, curr: any) => acc + (precio * (Number(curr.porcentaje) || 0) / 100), 0);
+  const totalDeducciones = (proyecto.deducciones || []).reduce((acc: number, curr: DeduccionItemConUsuario) => acc + (precio * (Number(curr.porcentaje) || 0) / 100), 0);
   const restante = precio - totalDeducciones;
 
   const donutData = [
@@ -412,7 +415,7 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
   ].filter(d => d.value > 0);
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-6 px-4 pt-32 pb-16 md:px-8 md:pt-20">
+    <div className="w-full max-w-5xl mx-auto space-y-6 px-2 pt-32 pb-8 md:px-4 md:pt-28">
       {/* Dynamic Browser Tab Title */}
       <title>{`Detalle de Proyecto: ${proyecto.nombre} | KORE BMS`}</title>
 
@@ -517,6 +520,8 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
                     cornerRadius={6}
                     dataKey="value"
                     stroke="none"
+                    onMouseEnter={(_: unknown, index: number) => setHoveredSegment(donutData[index])}
+                    onMouseLeave={() => setHoveredSegment(null)}
                   >
                     {donutData.map((entry, index) => (
                       <Cell key={`donut-cell-${index}`} fill={entry.color} />
@@ -525,8 +530,15 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute flex flex-col items-center justify-center text-center">
-                <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-black">Valor Total</span>
-                <span className="text-sm sm:text-lg font-black text-zinc-950 dark:text-zinc-50">Q{precio.toLocaleString()}</span>
+                <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-black">
+                  {hoveredSegment ? hoveredSegment.name : "Valor Total"}
+                </span>
+                <span 
+                  className="text-sm sm:text-lg font-black text-zinc-950 dark:text-zinc-50"
+                  style={{ color: hoveredSegment ? hoveredSegment.color : undefined }}
+                >
+                  Q{hoveredSegment ? hoveredSegment.value.toLocaleString() : precio.toLocaleString()}
+                </span>
               </div>
             </div>
           ) : (
@@ -546,10 +558,10 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
 
           {(() => {
             const activeDeds = (proyecto.deducciones || []).filter(
-              (d: any) => (Number(d.porcentaje) || 0) > 0
+              (d: DeduccionItemConUsuario) => (Number(d.porcentaje) || 0) > 0
             );
             const totalPct = activeDeds.reduce(
-              (acc: number, d: any) => acc + (Number(d.porcentaje) || 0), 0
+              (acc: number, d: DeduccionItemConUsuario) => acc + (Number(d.porcentaje) || 0), 0
             );
             if (activeDeds.length === 0) return null;
 

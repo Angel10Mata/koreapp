@@ -90,8 +90,9 @@ export async function signup(
     }
 
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Signup error:", err);
-    return { message: "Error inesperado: " + (err.message || "Error desconocido") };
+    const message = err instanceof Error ? err.message : "Error desconocido";
+    return { message: "Error inesperado: " + message };
   }
 }

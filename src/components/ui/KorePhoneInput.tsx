@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { getCountries, getCountryCallingCode, parsePhoneNumber, formatPhoneNumber } from "react-phone-number-input";
+import { Country, getCountries, getCountryCallingCode, parsePhoneNumber, formatPhoneNumber } from "react-phone-number-input";
 import flags from "react-phone-number-input/flags";
 import { cn } from "@/lib/utils";
 
@@ -22,14 +22,14 @@ export function KorePhoneInput({
   className,
   id,
 }: KorePhoneInputProps) {
-  const [country, setCountry] = useState<any>("GT");
+  const [country, setCountry] = useState<Country>("GT");
   const [localValue, setLocalValue] = useState("");
 
   // Helper to parse E164 value to country and local number
   const parseE164 = (val: string) => {
-    if (!val) return { country: "GT", local: "" };
+    if (!val) return { country: "GT" as Country, local: "" };
     const clean = val.trim().replace(/\s+/g, "");
-    if (!clean) return { country: "GT", local: "" };
+    if (!clean) return { country: "GT" as Country, local: "" };
 
     // Try finding a matching calling code
     for (const c of getCountries()) {
@@ -44,12 +44,13 @@ export function KorePhoneInput({
       }
     }
 
-    return { country: "GT", local: val };
+    return { country: "GT" as Country, local: val };
   };
 
   // Sync internal state when external value changes
   useEffect(() => {
     const { country: parsedCountry, local: parsedLocal } = parseE164(value);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCountry(parsedCountry);
     setLocalValue(parsedLocal);
   }, [value]);
@@ -72,7 +73,7 @@ export function KorePhoneInput({
   };
 
   const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newCountry = e.target.value as any;
+    const newCountry = e.target.value as Country;
     setCountry(newCountry);
 
     const callingCode = getCountryCallingCode(newCountry);

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
+import { clienteSchema, ClienteFormValues } from "./zod";
 
 interface DBProyecto {
   id: string;
@@ -49,145 +50,191 @@ interface Cliente {
 // READ — Fetches all clients from pro_clientes with their associated projects
 // ─────────────────────────────────────────────────────────────────────────────
 export async function getClientes(): Promise<Cliente[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("pro_clientes")
-    .select(`
-      *,
-      proyectos(id, nombre, estado, valor, fecha_entrega)
-    `)
-    .order("nombre", { ascending: true });
+  try {
+    const supabase = await createClient();
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
 
-  if (error) {
-    console.error("Error fetching clientes:", error);
+    const { data, error } = await supabase
+      .from("pro_clientes")
+      .select(`
+        *,
+        proyectos(id, nombre, estado, valor, fecha_entrega)
+      `)
+      .order("nombre", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching clientes:", error);
+      return [];
+    }
+
+    return ((data as unknown as DBCliente[]) || []).map((c: DBCliente) => {
+      const proyectosList = c.proyectos || [];
+      const totalPagado = proyectosList.reduce(
+        (acc: number, p: DBProyecto) => acc + (Number(p.valor) || 0),
+        0
+      );
+      return {
+        id: c.id,
+        nombre: c.nombre,
+        nit: c.nit || "",
+        telefono: c.telefono || "",
+        correo: c.correo || "",
+        departamento: c.departamento || "",
+        municipio: c.municipio || "",
+        created_at: c.created_at,
+        proyectosCount: proyectosList.length,
+        totalPagado,
+        proyectosList: proyectosList
+          .map((p: DBProyecto) => ({
+            id: p.id,
+            nombre: p.nombre,
+            estado: p.estado,
+            precio: Number(p.valor) || 0,
+            fecha: p.fecha_entrega,
+          }))
+          .sort((a: ClienteProyecto, b: ClienteProyecto) => b.precio - a.precio),
+      };
+    }).sort((a: Cliente, b: Cliente) => b.totalPagado - a.totalPagado);
+  } catch (err) {
+    console.error("Unexpected error in getClientes:", err);
     return [];
   }
-
-  return ((data as unknown as DBCliente[]) || []).map((c: DBCliente) => {
-    const proyectosList = c.proyectos || [];
-    const totalPagado = proyectosList.reduce(
-      (acc: number, p: DBProyecto) => acc + (Number(p.valor) || 0),
-      0
-    );
-    return {
-      id: c.id,
-      nombre: c.nombre,
-      nit: c.nit || "",
-      telefono: c.telefono || "",
-      correo: c.correo || "",
-      departamento: c.departamento || "",
-      municipio: c.municipio || "",
-      created_at: c.created_at,
-      proyectosCount: proyectosList.length,
-      totalPagado,
-      proyectosList: proyectosList
-        .map((p: DBProyecto) => ({
-          id: p.id,
-          nombre: p.nombre,
-          estado: p.estado,
-          precio: Number(p.valor) || 0,
-          fecha: p.fecha_entrega,
-        }))
-        .sort((a: ClienteProyecto, b: ClienteProyecto) => b.precio - a.precio),
-    };
-  }).sort((a: Cliente, b: Cliente) => b.totalPagado - a.totalPagado);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CREATE — Register a new client in pro_clientes
 // ─────────────────────────────────────────────────────────────────────────────
-export async function createCliente(data: {
-  nombre: string;
-  nit?: string;
-  telefono?: string;
-  correo?: string;
-  departamento?: string;
-  municipio?: string;
-}) {
-  const supabase = await createClient();
+export async function createCliente(data: ClienteFormValues) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "No autorizado." };
 
-  const { data: newCliente, error } = await supabase
-    .from("pro_clientes")
-    .insert([
-      {
-        nombre: data.nombre.trim(),
-        nit: data.nit?.trim() || null,
-        telefono: data.telefono?.trim() || null,
-        correo: data.correo?.trim() || null,
-        departamento: data.departamento?.trim() || null,
-        municipio: data.municipio?.trim() || null,
-      },
-    ])
-    .select()
-    .single();
+    // Validación Zod
+    const parsed = clienteSchema.safeParse(data);
+    if (!parsed.success) {
+      return { error: "Datos de cliente inválidos.", details: parsed.error.format() };
+    }
 
-  if (error) {
-    console.error("Error creating cliente:", error);
-    return { error: error.message };
+    const { data: newCliente, error } = await supabase
+      .from("pro_clientes")
+      .insert([{
+        nombre: parsed.data.nombre.trim(),
+        nit: parsed.data.nit?.trim() || null,
+        telefono: parsed.data.telefono?.trim() || null,
+        correo: parsed.data.correo?.trim() || null,
+        departamento: parsed.data.departamento?.trim() || null,
+        municipio: parsed.data.municipio?.trim() || null,
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error creating cliente:", error);
+      return { error: "Error de base de datos al crear el cliente." };
+    }
+
+    revalidatePath("/kore/clientes");
+    revalidatePath("/kore/proyectos");
+    return { success: true, cliente: newCliente };
+  } catch (err) {
+    console.error("Unexpected error in createCliente:", err);
+    return { error: "Ocurrió un error inesperado al procesar la solicitud." };
   }
-
-  revalidatePath("/kore/clientes");
-  revalidatePath("/kore/proyectos");
-  return { success: true, cliente: newCliente };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UPDATE — Modify existing client details in pro_clientes
 // ─────────────────────────────────────────────────────────────────────────────
-export async function updateCliente(
-  id: string,
-  data: {
-    nombre: string;
-    nit?: string;
-    telefono?: string;
-    correo?: string;
-    departamento?: string;
-    municipio?: string;
+export async function updateCliente(id: string, data: ClienteFormValues) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "No autorizado." };
+
+    if (!id) return { error: "ID de cliente no proporcionado." };
+
+    // Validación Zod
+    const parsed = clienteSchema.safeParse(data);
+    if (!parsed.success) {
+      return { error: "Datos de cliente inválidos.", details: parsed.error.format() };
+    }
+
+    const { data: updatedCliente, error } = await supabase
+      .from("pro_clientes")
+      .update({
+        nombre: parsed.data.nombre.trim(),
+        nit: parsed.data.nit?.trim() || null,
+        telefono: parsed.data.telefono?.trim() || null,
+        correo: parsed.data.correo?.trim() || null,
+        departamento: parsed.data.departamento?.trim() || null,
+        municipio: parsed.data.municipio?.trim() || null,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error updating cliente:", error);
+      return { error: "Error de base de datos al actualizar el cliente." };
+    }
+
+    revalidatePath("/kore/clientes");
+    revalidatePath("/kore/proyectos");
+    return { success: true, cliente: updatedCliente };
+  } catch (err) {
+    console.error("Unexpected error in updateCliente:", err);
+    return { error: "Ocurrió un error inesperado al procesar la solicitud." };
   }
-) {
-  const supabase = await createClient();
-
-  const { data: updatedCliente, error } = await supabase
-    .from("pro_clientes")
-    .update({
-      nombre: data.nombre.trim(),
-      nit: data.nit?.trim() || null,
-      telefono: data.telefono?.trim() || null,
-      correo: data.correo?.trim() || null,
-      departamento: data.departamento?.trim() || null,
-      municipio: data.municipio?.trim() || null,
-    })
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error updating cliente:", error);
-    return { error: error.message };
-  }
-
-  revalidatePath("/kore/clientes");
-  revalidatePath("/kore/proyectos");
-  return { success: true, cliente: updatedCliente };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE — Remove a client record from pro_clientes
 // ─────────────────────────────────────────────────────────────────────────────
 export async function deleteCliente(id: string) {
-  const supabase = await createClient();
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "No autorizado." };
 
-  const { error } = await supabase
-    .from("pro_clientes")
-    .delete()
-    .eq("id", id);
+    if (!id) return { error: "ID de cliente no proporcionado." };
 
-  if (error) {
-    console.error("Error deleting cliente:", error);
-    return { error: error.message };
+    // Verificar explícitamente si tiene proyectos asociados
+    const { data: proyectos, error: errorProyectos } = await supabase
+      .from("proyectos")
+      .select("id")
+      .eq("cliente_id", id)
+      .limit(1);
+
+    if (errorProyectos) {
+      console.error("Error checking proyectos for client:", errorProyectos);
+      return { error: "No se pudo verificar la asociación del cliente." };
+    }
+
+    if (proyectos && proyectos.length > 0) {
+      return { error: "No se puede eliminar un cliente que tenga proyectos asignados." };
+    }
+
+    const { error } = await supabase
+      .from("pro_clientes")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("Error deleting cliente:", error);
+      if (error.code === '23503' || error.message?.includes('foreign key constraint')) {
+        return { error: "No se puede eliminar un cliente que tenga proyectos asignados." };
+      }
+      return { error: "Error de base de datos al eliminar el cliente." };
+    }
+
+    revalidatePath("/kore/clientes");
+    revalidatePath("/kore/proyectos");
+    return { success: true };
+  } catch (err) {
+    console.error("Unexpected error in deleteCliente:", err);
+    return { error: "Ocurrió un error inesperado al procesar la solicitud." };
   }
-
-  revalidatePath("/kore/clientes");
-  revalidatePath("/kore/proyectos");
-  return { success: true };
 }

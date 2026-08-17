@@ -1,10 +1,4 @@
-"use client";
-
-import React, { useState } from "react";
-
-import { ServicesSection } from "@/components/(base)/(home)/services";
-import { AboutSection } from "@/components/(base)/(home)/about";
-import { ContactSection } from "@/components/(base)/(home)/contact";
+import React from "react";
 import LoginForm from "@/components/(base)/(auth)/login/LogIn";
 
 export default function Home() {

@@ -9,7 +9,6 @@ import { createClient } from "@/utils/supabase/server";
 import Providers from "@/components/(base)/providers/QueryProviders";
 import { UserProvider } from "@/components/(base)/providers/UserProvider";
 import { AuroraText } from "@/components/ui/aurora-text";
-import { DotPattern } from "@/components/ui/dot-pattern";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
