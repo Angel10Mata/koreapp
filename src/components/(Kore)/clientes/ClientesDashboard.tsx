@@ -246,7 +246,7 @@ export default function ClientesDashboard() {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col gap-6 text-foreground px-2 pt-32 pb-16 md:px-8 md:pt-24 relative">
+    <div className="w-full max-w-7xl mx-auto flex flex-col gap-6 text-foreground px-4 pt-32 pb-16 md:px-8 md:pt-24 relative">
       {/* Background Decorative Glows */}
       <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] bg-celeste-kore/10 rounded-full blur-[120px] pointer-events-none -z-10 animate-pulse" />
       <div className="absolute bottom-[10%] right-[-5%] w-[30%] h-[30%] bg-[#B7494E]/5 rounded-full blur-[100px] pointer-events-none -z-10" />
@@ -283,7 +283,7 @@ export default function ClientesDashboard() {
       </div>
 
       {/* MAIN LAYOUT WITH CARD BACKGROUND */}
-      <div className="w-full max-w-5xl mx-auto overflow-visible relative rounded-3xl border border-zinc-200 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/40 backdrop-blur-xl shadow-xl dark:shadow-2xl dark:shadow-black/60 px-2 py-6 sm:p-6 md:p-10 flex flex-col gap-6">
+      <div className="w-full max-w-5xl mx-auto overflow-visible relative rounded-3xl border border-zinc-200 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/40 backdrop-blur-xl shadow-xl dark:shadow-2xl dark:shadow-black/60 p-6 md:p-10 flex flex-col gap-6">
           {/* Search bar */}
           <div className="relative w-full">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground size-4" />

@@ -262,12 +262,35 @@ function DeduccionRow({
         <div className="relative ml-1 shrink-0" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
-            onClick={onRemove}
-            className="flex items-center justify-center p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground/30 hover:text-red-500 transition-all cursor-pointer shrink-0"
-            title="Eliminar deducción"
+            onClick={() => setShowMenu(!showMenu)}
+            className="flex items-center justify-center p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-muted-foreground/30 hover:text-foreground transition-all cursor-pointer shrink-0"
+            title="Acciones"
           >
-            <Trash2 size={14} />
+            <MoreVertical size={14} />
           </button>
+          
+          {showMenu && (
+            <>
+              {/* Overlay transparente para cerrar al hacer clic afuera */}
+              <div 
+                className="fixed inset-0 z-40 cursor-default" 
+                onClick={() => setShowMenu(false)}
+              />
+              <div className="absolute right-0 top-full mt-1 z-50 bg-background dark:bg-zinc-950 border border-border dark:border-white/10 rounded-xl shadow-2xl p-1 w-24 flex flex-col gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onRemove();
+                    setShowMenu(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-500 hover:bg-red-500/10 text-left transition-colors cursor-pointer"
+                >
+                  <Trash2 size={12} />
+                  Eliminar
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -481,15 +504,12 @@ function FormDedListWithToggle({
             Total: Q{totalDeduccionesMonetario.toLocaleString("en-US", { minimumFractionDigits: 2 })} ({totalPct}%)
           </span>
           {sortedDeds.length > 0 && (
-            <div className="p-1 rounded-md bg-muted/40 dark:bg-white/10 flex items-center justify-center ml-1">
-              <ChevronDown
-                size={16}
-                strokeWidth={2.5}
-                className={`text-foreground/80 transition-transform duration-200 ${
-                  allExpanded ? "rotate-180" : ""
-                }`}
-              />
-            </div>
+            <ChevronDown
+              size={13}
+              className={`text-muted-foreground/50 transition-transform duration-200 ${
+                allExpanded ? "rotate-180" : ""
+              }`}
+            />
           )}
         </div>
       </button>
@@ -671,29 +691,6 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
         });
         router.push("/kore/proyectos");
       }
-    }
-  };
-
-  const handleRemoveClient = async () => {
-    const isDark = typeof window !== "undefined" && document.documentElement.classList.contains("dark");
-    const result = await Swal.fire({
-      title: '¿Quitar cliente?',
-      text: "Esto quitará al cliente del proyecto. No se eliminará al cliente del sistema.",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: isDark ? '#27272a' : '#71717a',
-      confirmButtonText: 'Sí, quitar',
-      cancelButtonText: 'Cancelar',
-      background: isDark ? '#18181b' : '#ffffff',
-      color: isDark ? '#ffffff' : '#000000',
-    });
-
-    if (result.isConfirmed) {
-      setValue("cliente_nombre", "", { shouldValidate: true });
-      setValue("cliente_nit", "");
-      setValue("cliente_telefono", "");
-      setValue("cliente_correo", "");
     }
   };
 
@@ -1078,7 +1075,7 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="w-full max-w-5xl mx-auto flex flex-col gap-6 text-foreground px-2 pt-32 pb-8 md:px-4 md:pt-28 relative mt-4 md:mt-8"
+      className="w-full max-w-5xl mx-auto flex flex-col gap-6 text-foreground px-4 pt-32 pb-16 md:px-8 md:pt-24 relative"
     >
       <title>{isEditing ? `Editar Proyecto: ${proyecto?.nombre || ""} | KORE BMS` : "Nuevo Proyecto | KORE BMS"}</title>
 
@@ -1086,7 +1083,7 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
       <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] bg-celeste-kore/10 rounded-full blur-[120px] pointer-events-none -z-10 animate-pulse" />
 
       {/* CARD WRAPPER CONTAINING HEADER AND FORM */}
-      <div className="w-full max-w-5xl mx-auto overflow-visible relative rounded-3xl border border-zinc-200 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/40 backdrop-blur-xl shadow-xl dark:shadow-2xl dark:shadow-black/60 p-4 sm:p-6 flex flex-col gap-6">
+      <div className="w-full max-w-5xl mx-auto overflow-visible relative rounded-3xl border border-zinc-200 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/40 backdrop-blur-xl shadow-xl dark:shadow-2xl dark:shadow-black/60 p-6 md:p-10 flex flex-col gap-6">
         {/* Header bar */}
         <div className="flex flex-col gap-4 border-b border-border/40 pb-6 shrink-0">
           <div className="flex items-center gap-3">
@@ -1222,17 +1219,7 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
                       <p className="text-[9px] sm:text-[10px] font-black uppercase text-celeste-kore tracking-widest">
                         Datos del Cliente
                       </p>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={handleRemoveClient}
-                          className="text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 rounded-md p-1.5 transition-all"
-                          title="Quitar cliente del proyecto"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                        <div className="w-1.5 h-1.5 rounded-full bg-celeste-kore animate-pulse" />
-                      </div>
+                      <div className="w-1.5 h-1.5 rounded-full bg-celeste-kore animate-pulse" />
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
@@ -1759,14 +1746,14 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
           </form>
 
           {/* Form Footer Buttons */}
-          <div className="flex gap-3 pt-6 border-t border-border/40 justify-end mt-8 flex-nowrap">
+          <div className="flex gap-4 pt-6 border-t border-border/40 justify-end mt-8">
             {step === 2 && (
                <button
                  type="button"
                  onClick={() => setStep(1)}
-                 className="px-4 py-2.5 rounded-xl border border-celeste-kore bg-transparent text-celeste-kore hover:bg-celeste-kore/10 transition-colors text-[11px] font-bold uppercase tracking-wider cursor-pointer whitespace-nowrap shrink-0"
+                 className="px-6 py-3 rounded-xl border border-celeste-kore bg-transparent text-celeste-kore hover:bg-celeste-kore/10 transition-colors text-xs font-bold uppercase tracking-wider cursor-pointer whitespace-nowrap"
                >
-                 Anterior
+                 Paso Anterior
                </button>
             )}
             {(step === 2 || isDeveloper) && (
@@ -1774,7 +1761,7 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
                 form="proyecto-form"
                 type="submit"
                 disabled={isSubmitting}
-                className="px-6 py-2.5 rounded-xl border border-celeste-kore bg-transparent text-celeste-kore hover:bg-celeste-kore/10 transition-colors text-[11px] font-bold uppercase tracking-wider cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0"
+                className="px-8 py-3 rounded-xl border border-celeste-kore bg-transparent text-celeste-kore hover:bg-celeste-kore/10 transition-colors text-xs font-bold uppercase tracking-wider cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0"
               >
                 {isSubmitting ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -1788,9 +1775,9 @@ export default function ProyectoForm({ proyecto: proyectoProp }: ProyectoFormPro
                <button
                  type="button"
                  onClick={() => setStep(2)}
-                 className="px-6 py-2.5 rounded-xl border border-celeste-kore bg-transparent text-celeste-kore hover:bg-celeste-kore/10 transition-colors text-[11px] font-bold uppercase tracking-wider cursor-pointer whitespace-nowrap shrink-0"
+                 className="px-8 py-3 rounded-xl border border-celeste-kore bg-transparent text-celeste-kore hover:bg-celeste-kore/10 transition-colors text-xs font-bold uppercase tracking-wider cursor-pointer whitespace-nowrap"
                >
-                 Siguiente
+                 Siguiente Paso
                </button>
             )}
           </div>

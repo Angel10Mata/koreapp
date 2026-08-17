@@ -148,15 +148,12 @@ function DetailDedListWithToggle({
             Total: Q{totalDeduccionesMonetario.toLocaleString("en-US", { minimumFractionDigits: 2 })} ({totalPct}%)
           </span>
           {sortedDeds.length > 0 && (
-            <div className="p-1 rounded-md bg-muted/40 dark:bg-white/10 flex items-center justify-center ml-1">
-              <ChevronDown
-                size={16}
-                strokeWidth={2.5}
-                className={`text-foreground/80 transition-transform duration-200 ${
-                  allExpanded ? "rotate-180" : ""
-                }`}
-              />
-            </div>
+            <ChevronDown
+              size={13}
+              className={`text-muted-foreground/50 transition-transform duration-200 ${
+                allExpanded ? "rotate-180" : ""
+              }`}
+            />
           )}
         </div>
       </button>
@@ -241,7 +238,6 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
   const isDeveloper = effectiveRole === "proyectos";
   const { resolvedTheme } = useTheme();
   const [showRiskZone, setShowRiskZone] = useState(false);
-  const [hoveredSegment, setHoveredSegment] = useState<{name: string, value: number, color: string} | null>(null);
 
   // Role guard
   useEffect(() => {
@@ -521,8 +517,6 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
                     cornerRadius={6}
                     dataKey="value"
                     stroke="none"
-                    onMouseEnter={(_, index) => setHoveredSegment(donutData[index])}
-                    onMouseLeave={() => setHoveredSegment(null)}
                   >
                     {donutData.map((entry, index) => (
                       <Cell key={`donut-cell-${index}`} fill={entry.color} />
@@ -531,15 +525,8 @@ export default function ProyectoDetalle({ proyecto: proyectoProp }: ProyectoDeta
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute flex flex-col items-center justify-center text-center">
-                <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-black">
-                  {hoveredSegment ? hoveredSegment.name : "Valor Total"}
-                </span>
-                <span 
-                  className="text-sm sm:text-lg font-black text-zinc-950 dark:text-zinc-50"
-                  style={{ color: hoveredSegment ? hoveredSegment.color : undefined }}
-                >
-                  Q{hoveredSegment ? hoveredSegment.value.toLocaleString() : precio.toLocaleString()}
-                </span>
+                <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-black">Valor Total</span>
+                <span className="text-sm sm:text-lg font-black text-zinc-950 dark:text-zinc-50">Q{precio.toLocaleString()}</span>
               </div>
             </div>
           ) : (
